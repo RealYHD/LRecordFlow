@@ -1,5 +1,5 @@
-import Store from "electron-store";
 import type { AppState, Preferences } from "./entities";
+import { Conf } from 'electron-conf/renderer'
 
-export const preferencesStore: Store<Preferences> = new Store<Preferences>()
-export const appStateStore: Store<AppState> = new Store<AppState>()
+export const preferencesStore: Conf<Preferences> = new Conf<Preferences>()
+export const appStateStore: Conf<AppState> = new Conf<AppState>()

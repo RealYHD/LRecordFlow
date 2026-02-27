@@ -2,6 +2,8 @@
   import { Router } from 'sv-router'
   import { p } from './lib/router'
   import { appStateStore } from './state.svelte'
+
+  
 </script>
 
 <div class="navbar bg-base-100 shadow-sm max-w-dvw">
@@ -11,6 +13,7 @@
   <div class="navbar-center flex-1 breadcrumbs justify-center">
     <ul>
       <li>
+
         {#if appStateStore.has('activeRepository')}
           <a href={p('/view/relational')}>{appStateStore.get('activeRepository').name}</a>
         {:else}
