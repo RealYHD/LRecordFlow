@@ -4,9 +4,14 @@ export enum RepoView {
 
 export interface Repository {
     name: string
-    url: string
-    gitUser: string
-    gitPassword: string
+    remote: string
+    localPath: string
+    lastAccessed: Date
+}
+
+export interface Record {
+    repository: Repository
+    path: string
 }
 
 export interface Preferences {
@@ -16,5 +21,7 @@ export interface Preferences {
 
 export interface AppState {
     activeRepository: Repository
+    activeRecord: Record
     activeRepoView: RepoView
+    knownRepos: Repository[]
 }

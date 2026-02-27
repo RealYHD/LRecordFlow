@@ -15,7 +15,7 @@ export const { p, navigate, isActive, route } = createRouter({
         "/item": RepoItemOverviewPage,
         layout: OverviewLayout
     },
-    "/:record": DetailedRecordViewPage,
+    "/record": DetailedRecordViewPage,
     "/configure": ConfigureRepoPage,
     "/save": SavePage,
     "/help": {

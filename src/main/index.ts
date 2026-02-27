@@ -2,7 +2,8 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { useConf } from 'electron-conf/main'
+import './repositories'
+import './persistence'
 
 function createWindow(): void {
   // Create the browser window.
@@ -40,11 +41,10 @@ function createWindow(): void {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
-  // Initialize configuration persistence
-  useConf()
-
+  
   // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId('me.realyhd.reporecords')
+
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.

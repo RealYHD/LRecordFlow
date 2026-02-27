@@ -18,7 +18,13 @@ export default defineConfig(
   {
     files: ['**/*.{tsx,svelte}'],
     rules: {
-      'svelte/no-unused-svelte-ignore': 'off'
+      'svelte/no-unused-svelte-ignore': 'off',
+      'prettier/prettier': [
+        'error',
+        {
+          endOfLine: 'auto'
+        }
+      ]
     }
   },
   eslintConfigPrettier
