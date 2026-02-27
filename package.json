@@ -25,6 +25,7 @@
     "@electron-toolkit/utils": "^4.0.0",
     "@tailwindcss/vite": "^4.2.1",
     "daisyui": "^5.5.19",
+    "electron-store": "^11.0.2",
     "electron-updater": "^6.3.9",
     "simple-git": "^3.32.3",
     "sv-router": "^0.14.0",
