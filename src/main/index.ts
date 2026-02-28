@@ -2,8 +2,8 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import './repositories'
-import './persistence'
+import { Conf, useConf } from 'electron-conf'
+import { registerIPCHandles } from './repoIPC'
 
 function createWindow(): void {
   // Create the browser window.
@@ -41,7 +41,7 @@ function createWindow(): void {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
-  
+
   // Set app user model id for windows
   electronApp.setAppUserModelId('me.realyhd.reporecords')
 
@@ -53,9 +53,16 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
-
+  registerIPCHandles()
+  // Initialize configuration persistence
+  let preferencesStore = new Conf({name: "preferences"})
+  preferencesStore.registerRendererListener("preferences")
+  let  appStateStore = new Conf({name: "state"})
+  appStateStore.registerRendererListener("state")
+  useConf()
   createWindow()
 
   app.on('activate', function () {
