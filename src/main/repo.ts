@@ -4,34 +4,30 @@ import path from "path";
 
 export const recordMetadataFilename = "record.json"
 
-function getRecordPath(workingDir: string, localRepoName: string, recordIdentifier: string): string {
-    return path.join(workingDir, localRepoName, recordIdentifier)
+function getRecordPath(localRepoPath: string, recordIdentifier: string): string {
+    return path.join(localRepoPath, recordIdentifier)
 }
 
-function getRecordMetadataPath(workingDir: string, localRepoName: string, recordIdentifier: string): string {
-    return path.join(getRecordPath(workingDir, localRepoName, recordIdentifier), recordMetadataFilename)
+function getRecordMetadataPath(localRepoPath: string, recordIdentifier: string): string {
+    return path.join(getRecordPath(localRepoPath, recordIdentifier), recordMetadataFilename)
 }
 
-function getRepositoryPath(workingDir: string, localRepoName: string) {
-    return path.join(workingDir, localRepoName)
+export async function cloneGitRepository(remoteRepoPath: string, localRepoPath: string) {
+    return await simpleGit({ baseDir: localRepoPath }).clone(remoteRepoPath)
 }
 
-export async function cloneGitRepository(workingDir: string, remoteRepoPath: string) {
-    return await simpleGit({ baseDir: workingDir }).clone(remoteRepoPath)
+export async function repoHasPendingChanges(localRepoPath: string) {
+    return (await simpleGit({ baseDir: localRepoPath }).status()).modified
 }
 
-export async function repoHasPendingChanges(workingDir: string, localRepoName: string) {
-    return (await simpleGit({ baseDir: getRepositoryPath(workingDir, localRepoName) }).status()).modified
-}
-
-export async function repoIsSynced(workingDir: string, localRepoName: string) {
-    let gitStatus = await simpleGit({ baseDir: getRepositoryPath(workingDir, localRepoName) }).fetch().status()
+export async function repoIsSynced(localRepoPath: string) {
+    let gitStatus = await simpleGit({ baseDir: localRepoPath }).fetch().status()
     return gitStatus.ahead == 0 && gitStatus.behind == 0
 }
 
-async function merge(workingDir: string, localRepoName: string, options: TaskOptions) {
+async function merge(localRepoPath: string, options: TaskOptions) {
     try {
-        const mergeSummary = await simpleGit({baseDir: getRepositoryPath(workingDir, localRepoName)}).merge(options);
+        const mergeSummary = await simpleGit({baseDir: localRepoPath}).merge(options);
         return mergeSummary.conflicts;
     } catch (err) {
         const mergeSummary: MergeResult = (err as GitResponseError<MergeResult>).git;
@@ -40,66 +36,61 @@ async function merge(workingDir: string, localRepoName: string, options: TaskOpt
     }
 }
 
-export async function syncLocalRepoWithRemote(workingDir: string, localRepoName: string) {
-    return merge(workingDir, localRepoName, [])
+export async function syncLocalRepoWithRemote(localRepoPath: string) {
+    return merge(localRepoPath, [])
 }
 
-export async function continueSyncLocalRepoWithRemote(workingDir: string, localRepoName: string) {
-    return merge(workingDir, localRepoName, ["--continue"])
+export async function continueSyncLocalRepoWithRemote(localRepoPath: string) {
+    return merge(localRepoPath, ["--continue"])
 }
 
-export async function abortSyncLocalRepoWithRemote(workingDir: string, localRepoName: string) {
-    return merge(workingDir, localRepoName, ["--abort"])
+export async function abortSyncLocalRepoWithRemote(localRepoPath: string) {
+    return merge(localRepoPath, ["--abort"])
 }
 
-export async function syncRemoteRepoWithLocal(workingDir: string, localRepoName: string) {
-    return (await simpleGit({ baseDir: getRepositoryPath(workingDir, localRepoName) }).push()).remoteMessages
+export async function syncRemoteRepoWithLocal(localRepoPath: string) {
+    return (await simpleGit({ baseDir: localRepoPath }).push()).remoteMessages
 }
 
-export async function save(workingDir: string, localRepoName: string, modificationNotes: string) {
-    return (await simpleGit({ baseDir: getRepositoryPath(workingDir, localRepoName) }).add(".").commit(modificationNotes)).summary
+export async function save(localRepoPath: string, modificationNotes: string) {
+    return (await simpleGit({ baseDir: localRepoPath }).add(".").commit(modificationNotes)).summary
 }
 
-export async function recordExists(workingDir: string, localRepoName: string, recordIdentifier: string): Promise<boolean> {
-    let recordDirectory = getRecordPath(workingDir, localRepoName, recordIdentifier)
+export async function recordExists(localRepoPath: string, recordIdentifier: string): Promise<boolean> {
+    let recordDirectory = getRecordPath(localRepoPath, recordIdentifier)
     return (await (fs.stat(recordDirectory))).isDirectory()
 }
 
-export async function recordHasMetadata(workingDir: string, localRepoName: string, recordIdentifier: string): Promise<boolean> {
-    return (await (fs.stat(getRecordMetadataPath(workingDir, localRepoName, recordIdentifier)))).isFile()
+export async function recordHasMetadata(localRepoPath: string, recordIdentifier: string): Promise<boolean> {
+    return (await (fs.stat(getRecordMetadataPath(localRepoPath, recordIdentifier)))).isFile()
 }
 
-export async function createRecord(workingDir: string, localRepoName: string, recordIdentifier: string) {
-    if (await recordExists(workingDir, localRepoName, recordIdentifier)) return
-    return await fs.mkdir(getRecordPath(workingDir, localRepoName, recordIdentifier))
+export async function createRecord(localRepoPath: string, recordIdentifier: string) {
+    if (await recordExists(localRepoPath, recordIdentifier)) return
+    return await fs.mkdir(getRecordPath(localRepoPath, recordIdentifier))
 }
 
-export async function deleteRecord(workingDir: string, localRepoName: string, recordIdentifier: string) {
-    if (!await recordExists(workingDir, localRepoName, recordIdentifier)) return
-    return await fs.rm(getRecordPath(workingDir, localRepoName, recordIdentifier), { recursive: true, force: true })
+export async function deleteRecord(localRepoPath: string, recordIdentifier: string) {
+    if (!await recordExists(localRepoPath, recordIdentifier)) return
+    return await fs.rm(getRecordPath(localRepoPath, recordIdentifier), { recursive: true, force: true })
 }
 
-export async function getRecord(workingDir: string, localRepoName: string, recordIdentifier: string) {
-    if (!await recordExists(workingDir, localRepoName, recordIdentifier)) return "{}"
-    if (await recordHasMetadata(workingDir, localRepoName, recordIdentifier)) {
-        return JSON.parse(await fs.readFile(getRecordMetadataPath(workingDir, localRepoName, recordIdentifier), 'utf-8'))
+export async function getRecord(localRepoPath: string, recordIdentifier: string) {
+    if (!await recordExists(localRepoPath, recordIdentifier)) return "{}"
+    if (await recordHasMetadata(localRepoPath, recordIdentifier)) {
+        return JSON.parse(await fs.readFile(getRecordMetadataPath(localRepoPath, recordIdentifier), 'utf-8'))
     }
 }
 
-export async function setRecord(workingDir: string, localRepoName: string, recordIdentifier: string, record: object) {
-    return await fs.writeFile(getRecordMetadataPath(workingDir, localRepoName, recordIdentifier), JSON.stringify(record))
+export async function setRecord(localRepoPath: string, recordIdentifier: string, record: object) {
+    return await fs.writeFile(getRecordMetadataPath(localRepoPath, recordIdentifier), JSON.stringify(record))
 }
 
-export async function repoExists(workingDir: string, localRepoName: string) {
-    let repoPath = getRepositoryPath(workingDir, localRepoName)
-    return (await fs.stat(repoPath)).isDirectory() && simpleGit({baseDir: repoPath}).checkIsRepo()
+export async function repoExists(localRepoPath: string) {
+    return (await fs.stat(localRepoPath)).isDirectory() && simpleGit({baseDir: localRepoPath}).checkIsRepo()
 }
 
-export async function getAllRepoRecords(workingDir: string, localRepoName: string) {
-    if (!repoExists(workingDir, localRepoName)) return [];
-    return (await fs.readdir(getRepositoryPath(workingDir, localRepoName), { withFileTypes: true })).filter(entry => entry.isDirectory())
-}
-
-export async function getAllRepos(workingDir: string) {
-    return (await fs.readdir(workingDir, {withFileTypes: true})).filter(entry => entry.isDirectory() && repoExists(workingDir, entry.name)).map((value) => value.name)
+export async function getAllRepoRecords(localRepoPath: string) {
+    if (!repoExists(localRepoPath)) return [];
+    return (await fs.readdir(localRepoPath, { withFileTypes: true })).filter(entry => entry.isDirectory())
 }

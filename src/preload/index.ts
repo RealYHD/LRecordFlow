@@ -1,6 +1,5 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import { exposeRepoFunctionsInMainWorld } from '../main/repoIPC'
 // Custom APIs for renderer
 const api = {}
 
@@ -10,8 +9,17 @@ const api = {}
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
-    contextBridge.exposeInMainWorld('api', api)
-    exposeRepoFunctionsInMainWorld()
+    ipcRenderer.invoke("getRegisteredIPCHandles").then((ipcHandles) => {
+      for (const [domain, handleKeys] of Object.entries(ipcHandles)) {
+        console.log(handleKeys)
+        contextBridge.exposeInMainWorld(
+          domain,
+          Object.fromEntries((handleKeys as [string, string][]).map(([key, handleKey]) => {
+            return [key, (...args: any) => ipcRenderer.invoke(handleKey, ...args)]
+          })))
+      }
+
+    })
   } catch (error) {
     console.error(error)
   }

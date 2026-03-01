@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Router } from 'sv-router'
   import { p } from './lib/router'
-  import { appStateStore } from './state.svelte'
+  import { appStoreState } from './state.svelte'
 </script>
 
 <nav>
@@ -11,30 +11,24 @@
     </div>
     <div class="navbar-center flex-1 breadcrumbs justify-center">
       <ul>
-        {#await appStateStore.get('activeRepository')}
-          <span class="loading loading-dots loading-sm"></span>
-        {:then activeRepository}
-          {#if activeRepository}
+        {#if appStoreState.appState}
+          {#if appStoreState.appState.activeRepository}
             <li>
-              <a href={p('/view/relational')}>{activeRepository.name}</a>
+              <a href={p('/view/relational')}>{appStoreState.appState.activeRepository.name}</a>
             </li>
-            {#await appStateStore.get('activeRecord')}
+            {#if appStoreState.appState.activeRecord}
               <li>
-                <span class="loading loading-dots loading-sm"></span>
+                <a href={p('/record')}>{appStoreState.appState.activeRecord.path}</a>
               </li>
-            {:then activeRecord}
-              {#if activeRecord}
-                <li>
-                  <a href={p('/record')}>{activeRecord.path}</a>
-                </li>
-              {/if}
-            {/await}
+            {/if}
           {:else}
             <li>
               <a href={p('/')}>Open Repository</a>
             </li>
           {/if}
-        {/await}
+        {:else}
+          <span class="loading loading-dots loading-sm"></span>
+        {/if}
       </ul>
     </div>
     <div class="navbar-end w-fit flex-none px-5">

@@ -2,8 +2,10 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { Conf, useConf } from 'electron-conf'
-import { registerIPCHandles } from './repoIPC'
+import { registerIPCHandleRetriever, registerIPCHandles } from './IpcIndexer'
+import * as repo from "./repo"
+import * as state from "./state"
+import * as dialog from "./dialog"
 
 function createWindow(): void {
   // Create the browser window.
@@ -56,13 +58,12 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
-  registerIPCHandles()
-  // Initialize configuration persistence
-  let preferencesStore = new Conf({name: "preferences"})
-  preferencesStore.registerRendererListener("preferences")
-  let  appStateStore = new Conf({name: "state"})
-  appStateStore.registerRendererListener("state")
-  useConf()
+
+  // Register Entire Module IPCs
+  registerIPCHandles(repo, "repo")
+  registerIPCHandles(state, "state")
+  registerIPCHandles(dialog, "dialog")
+  registerIPCHandleRetriever()
   createWindow()
 
   app.on('activate', function () {

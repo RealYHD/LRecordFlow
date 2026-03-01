@@ -15,13 +15,12 @@ export interface Record {
 }
 
 export interface Preferences {
-    workingDir: string
 }
 
 
 export interface AppState {
-    activeRepository: Repository
-    activeRecord: Record
+    activeRepository: Repository | null
+    activeRecord: Record | null
     activeRepoView: RepoView
     knownRepos: Repository[]
 }
