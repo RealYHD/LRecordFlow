@@ -7,6 +7,7 @@ export interface Repository {
     remote: string
     local: string
     lastAccessed: Date
+    status: "Ready" | "Cloning" | "Not Available"
 }
 
 export interface Record {

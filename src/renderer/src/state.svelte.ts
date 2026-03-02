@@ -1,4 +1,4 @@
-import { type AppState } from "./entities";
+import { type AppState, type Repository } from "./entities";
 
 export const appStateStore: { state: AppState } = $state({
     state: {

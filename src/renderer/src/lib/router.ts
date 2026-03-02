@@ -1,6 +1,6 @@
 import { createRouter } from 'sv-router';
 import SelectRepoPage from '../components/SelectRepoPage.svelte';
-import RepoRelationalOverviewPage from '../components/overview/RepoRelationalOverviewPage.svelte';
+import RepoRelationalOverviewPage from '../components/overview/RepoRelationalViewPage.svelte';
 import RepoItemOverviewPage from '../components/overview/RepoItemOverviewPage.svelte';
 import OverviewLayout from '../components/overview/OverviewLayout.svelte';
 import ConfigureRepoPage from '../components/ConfigureRepoPage.svelte';

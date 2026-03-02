@@ -76,7 +76,7 @@ export async function deleteRecord(localRepoPath: string, recordIdentifier: stri
 }
 
 export async function getRecord(localRepoPath: string, recordIdentifier: string) {
-    if (!await recordExists(localRepoPath, recordIdentifier)) return "{}"
+    if (!await recordExists(localRepoPath, recordIdentifier)) return {}
     if (await recordHasMetadata(localRepoPath, recordIdentifier)) {
         return JSON.parse(await fs.readFile(getRecordMetadataPath(localRepoPath, recordIdentifier), 'utf-8'))
     }

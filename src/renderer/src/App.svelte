@@ -14,6 +14,9 @@
     </div>
     <div class="navbar-center flex-1 breadcrumbs justify-center">
       <ul>
+        <li>
+          <a href={p('/')}>Select Repository</a>
+        </li>
         {#if appStateStore.state.activeRepository}
           <li>
             <a href={p('/view/relational')}>{appStateStore.state.activeRepository.name}</a>
@@ -23,10 +26,6 @@
               <a href={p('/record')}>{appStateStore.state.activeRecord.path}</a>
             </li>
           {/if}
-        {:else}
-          <li>
-            <a href={p('/')}>Open Repository</a>
-          </li>
         {/if}
       </ul>
     </div>

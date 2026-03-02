@@ -7,32 +7,30 @@
   let remoteInput: HTMLInputElement
   let localInput: HTMLInputElement
 
-  let errorMessage: string = $state('')
-  let { cloneJobs = $bindable() } = $props()
-
   function cloneGitRepository(name: string, remote: string, local: string): void {
-    cloneJobs += 1
     appStateStore.state.notifications.push({
       date: new Date(),
       message: `Began cloning repository ("${name}") from "${remote}" to "${local}"`,
       status: 'Information',
       title: `Cloning "${name}"`
     })
+    appStateStore.state.knownRepos.push({
+      name: name,
+      remote: remote,
+      local: local,
+      lastAccessed: new Date(),
+      status: 'Cloning'
+    })
     window['repo']
       .cloneGitRepository(remote, local)
       .then(() => {
-        appStateStore.state.knownRepos.push({
-          name: name,
-          remote: remote,
-          local: local,
-          lastAccessed: new Date()
-        })
         appStateStore.state.notifications.push({
           date: new Date(),
           message: `Completed cloning repository ("${name}") from "${remote}" to "${local}"`,
           status: 'Information',
           title: `Completed cloning "${name}"`
         })
+        appStateStore.state.knownRepos.find((repo) => repo.local == local).status = 'Ready'
       })
       .catch((err) => {
         appStateStore.state.notifications.push({
@@ -43,9 +41,7 @@
           status: 'Alert',
           title: `Failed to clone repository "${name}"`
         })
-      })
-      .finally(() => {
-        cloneJobs -= 1
+        appStateStore.state.knownRepos.find((repo) => repo.local == local).status = 'Not Available'
       })
     close()
   }
@@ -58,28 +54,6 @@
     gitCloneDialogue.close()
   }
 </script>
-
-{#if errorMessage.length > 0}
-  <div role="alert" class="alert alert-vertical sm:alert-horizontal">
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      class="stroke-info h-6 w-6 shrink-0"
-    >
-      <path
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-width="2"
-        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-      ></path>
-    </svg>
-    <span>{errorMessage}</span>
-    <div>
-      <button class="btn btn-sm btn-primary" onclick={() => (errorMessage = '')}>Close</button>
-    </div>
-  </div>
-{/if}
 
 <dialog bind:this={gitCloneDialogue} id="gitCloneDialogue" class="modal">
   <fieldset class="fieldset bg-base-200 border-base-300 rounded-box w-xs border p-4 modal-box">
