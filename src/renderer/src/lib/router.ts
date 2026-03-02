@@ -7,6 +7,7 @@ import ConfigureRepoPage from '../components/ConfigureRepoPage.svelte';
 import DetailedRecordViewPage from '../components/DetailedRecordViewPage.svelte';
 import SavePage from '../components/save/SavePage.svelte';
 import Help from '../components/help/Help.svelte';
+import OngoingTasksPage from '../components/TasksOverviewPage.svelte';
 
 export const { p, navigate, isActive, route } = createRouter({
     "/": SelectRepoPage,
@@ -17,6 +18,7 @@ export const { p, navigate, isActive, route } = createRouter({
     },
     "/record": DetailedRecordViewPage,
     "/configure": ConfigureRepoPage,
+    "/tasks": OngoingTasksPage,
     "/save": SavePage,
     "/help": {
         "/": Help

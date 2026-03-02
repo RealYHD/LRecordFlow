@@ -1,30 +1,40 @@
-import { writable, type Writable } from 'svelte/store'
-import { RepoView, type AppState, type Preferences } from "./entities";
+import { type AppState } from "./entities";
 
-export const appStoreState = {
-    subscribers: [],
+export const appStoreState: {
+    subscribers: Set<(value: AppState) => void>,
+    appState: AppState
+    set: (value: AppState) => void,
+    subscribe: (subscription: (value: AppState) => void) => (() => void)
+} = {
+    subscribers: new Set(),
     appState: {
         activeRepository: null,
         activeRecord: null,
-        activeRepoView: RepoView.Relational,
-        knownRepos: []
+        activeRepoView: 'Relational',
+        knownRepos: [],
+        notifications: []
     },
     set: (value: AppState) => {
         appStoreState.appState = value
         appStoreState.subscribers.forEach(subscriber => {
             subscriber(appStoreState.appState)
         });
-        window['state'].flush('state', value)
     },
-    subscribe: (subscription: (value: any) => void) => {
-        appStoreState.subscribers.push(subscription)
+    subscribe: (subscription: (value: AppState) => void) => {
+        appStoreState.subscribers.add(subscription)
         subscription(appStoreState.appState)
-    },
-    load: () => {
-        window['state'].load(appStoreState.appState)
-    },
-    save: (value: AppState) => {
-        window['state'].flush('state', value)
+        return () => appStoreState.subscribers.delete(subscription)
     }
 }
-appStoreState.load()
+
+export function flush() {
+    console.log("flush called")
+    window['state'].flush('state', appStoreState.appState).then(() => console.log("finished writing"))
+}
+
+export function load() {
+    window['state'].load('state', appStoreState.appState).then((value) => {
+        console.log("finished loading")
+        console.log(value)
+    })
+}

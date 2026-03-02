@@ -12,8 +12,9 @@ export async function flush(name: string, value: object) {
 
 export async function load(name: string, defaultValue: object) {
     let storePath = path.join(app.getPath("userData"), name + ".json")
-    if (!(existsSync(storePath) && (await stat(storePath)).isFile())) return defaultValue
     console.log("retrieving from " + storePath)
+    console.log(defaultValue)
+    if (!(existsSync(storePath) && (await stat(storePath)).isFile())) return defaultValue
     let result = await readFile(storePath, { encoding: 'utf-8' })
     return JSON.parse(result)
 }

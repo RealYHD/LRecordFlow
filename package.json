@@ -29,7 +29,8 @@
     "electron-updater": "^6.3.9",
     "simple-git": "^3.32.3",
     "sv-router": "^0.14.0",
-    "tailwindcss": "^4.2.1"
+    "tailwindcss": "^4.2.1",
+    "validator": "^13.15.26"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",

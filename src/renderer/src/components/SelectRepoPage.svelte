@@ -1,69 +1,21 @@
 <script lang="ts">
-  import { appStoreState } from '../state.svelte'
-  let gitCloneDialogue: HTMLDialogElement
-  let waiting: number = $state(0)
+  import { onMount, tick } from 'svelte'
+  import { appStoreState, flush, load } from '../state.svelte'
+  import GitCloneDialog from './GitCloneDialog.svelte'
+  let cloneJobsRunning = $state(0)
+  let gitCloneDialogue: GitCloneDialog
 
-  function cloneGitRepository(remote: string, local: string): void {
-    waiting += 1
-    window['repo']
-      .cloneGitRepository(remote, local)
-      .then(() => {
-        waiting -= 1
-      })
-      .catch((err) => console.log(err.message))
-  }
+  onMount(() => {
+    load()
+  })
+
+  tick().then(() => {
+    console.log('destroying')
+    flush()
+  })
 </script>
 
-<dialog bind:this={gitCloneDialogue} id="gitCloneDialogue" class="modal">
-  <div class="modal-box">
-    <form method="dialog">
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
-    </form>
-    <fieldset class="fieldset border-base-300 rounded-box w-xs border p-4 mx-auto">
-      <legend class="fieldset-legend">Clone Repository</legend>
-      <label for="gitRepositoryUrl" class="label">Git Repository URL</label>
-      <input
-        id="gitRepositoryUrl"
-        type="text"
-        class="input"
-        placeholder="ssh://git@repo"
-        disabled={Boolean(waiting)}
-      />
-      <label for="localRepositoryPath" class="label">Local Repository Path</label>
-      <div class="join">
-        <input
-          id="localRepositoryPath"
-          type="text"
-          class="input join-item"
-          placeholder="/home/me/repository"
-          disabled={Boolean(waiting)}
-        />
-        <button
-          class="btn join-item"
-          onclick={() =>
-            window['dialog']
-              .handleDirectoryOpen()
-              .then(
-                (path) =>
-                  ((
-                    gitCloneDialogue.querySelector('#localRepositoryPath') as HTMLInputElement
-                  ).value = path)
-              )}
-          disabled={Boolean(waiting)}>Select</button
-        >
-      </div>
-      <button
-        class="btn btn-neutral mt-4"
-        onclick={() =>
-          cloneGitRepository(
-            (gitCloneDialogue.querySelector('#gitRepositoryUrl') as HTMLInputElement).value,
-            (gitCloneDialogue.querySelector('#localRepositoryPath') as HTMLInputElement).value
-          )}
-        disabled={Boolean(waiting)}>Clone Repository</button
-      >
-    </fieldset>
-  </div>
-</dialog>
+<GitCloneDialog bind:cloneJobs={cloneJobsRunning} bind:this={gitCloneDialogue} />
 
 <div class="h-full flex flex-col">
   <div class="mx-auto container">
@@ -77,7 +29,7 @@
           </div>
         </div>
         <div class="flex justify-center px-4">
-          {#if waiting}
+          {#if cloneJobsRunning}
             <span class="loading loading-spinner loading-l"></span>
           {/if}
         </div>
@@ -85,17 +37,24 @@
           <!-- TODO Add import button -->
         </div>
         <button
-          onclick={() => gitCloneDialogue.showModal()}
+          onclick={() => gitCloneDialogue.open()}
           class="btn btn-square btn-ghost"
           aria-label="connect"
-          disabled={Boolean(waiting)}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
             ><path fill="currentColor" d="M8 19V5l11 7z" /></svg
           >
         </button>
       </li>
-      {#each appStoreState.appState.knownRepos as repo (repo.localPath)}
+      {#if cloneJobsRunning}
+        <li class="list-row skeleton">
+          <div>
+            <span class="skeleton skeleton-text">{cloneJobsRunning} clone processes ongoing...</span
+            >
+          </div>
+        </li>
+      {/if}
+      {#each $appStoreState.knownRepos as repo (repo.local)}
         <li class="list-row">
           <div>
             <div>{repo.name}</div>

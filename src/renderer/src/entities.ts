@@ -5,7 +5,7 @@ export enum RepoView {
 export interface Repository {
     name: string
     remote: string
-    localPath: string
+    local: string
     lastAccessed: Date
 }
 
@@ -14,13 +14,18 @@ export interface Record {
     path: string
 }
 
-export interface Preferences {
-}
-
 
 export interface AppState {
     activeRepository: Repository | null
     activeRecord: Record | null
-    activeRepoView: RepoView
+    activeRepoView: "Relational" | "Itemized"
     knownRepos: Repository[]
+    notifications: NotificationDescriptor[]
+}
+
+export interface NotificationDescriptor {
+    title: string
+    date: Date
+    status: "Information" | "Alert"
+    message: string
 }
