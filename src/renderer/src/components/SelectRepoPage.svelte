@@ -1,18 +1,8 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte'
-  import { appStoreState, flush, load } from '../state.svelte'
+  import { appStateStore } from '../state.svelte'
   import GitCloneDialog from './GitCloneDialog.svelte'
   let cloneJobsRunning = $state(0)
   let gitCloneDialogue: GitCloneDialog
-
-  onMount(() => {
-    load()
-  })
-
-  tick().then(() => {
-    console.log('destroying')
-    flush()
-  })
 </script>
 
 <GitCloneDialog bind:cloneJobs={cloneJobsRunning} bind:this={gitCloneDialogue} />
@@ -54,7 +44,7 @@
           </div>
         </li>
       {/if}
-      {#each $appStoreState.knownRepos as repo (repo.local)}
+      {#each appStateStore.state.knownRepos as repo (repo.local)}
         <li class="list-row">
           <div>
             <div>{repo.name}</div>

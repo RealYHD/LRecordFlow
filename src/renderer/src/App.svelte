@@ -1,9 +1,11 @@
 <script lang="ts">
   import { Router } from 'sv-router'
   import { p } from './lib/router'
-  import { appStoreState, flush, load } from './state.svelte'
-  import { onMount, tick } from 'svelte'
+  import { appStateStore, flush, load } from './state.svelte'
+  load()
 </script>
+
+<svelte:window onbeforeunload={() => flush()} />
 
 <nav>
   <div class="navbar bg-base-100 shadow-sm max-w-dvw">
@@ -12,13 +14,13 @@
     </div>
     <div class="navbar-center flex-1 breadcrumbs justify-center">
       <ul>
-        {#if $appStoreState.activeRepository}
+        {#if appStateStore.state.activeRepository}
           <li>
-            <a href={p('/view/relational')}>{$appStoreState.activeRepository.name}</a>
+            <a href={p('/view/relational')}>{appStateStore.state.activeRepository.name}</a>
           </li>
-          {#if $appStoreState.activeRecord}
+          {#if appStateStore.state.activeRecord}
             <li>
-              <a href={p('/record')}>{$appStoreState.activeRecord.path}</a>
+              <a href={p('/record')}>{appStateStore.state.activeRecord.path}</a>
             </li>
           {/if}
         {:else}

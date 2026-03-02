@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { appStoreState } from '../state.svelte'
+  import { appStateStore } from '../state.svelte'
 </script>
 
-<div class="container mx-auto">
+<div class="container px-5 mx-auto max-w-full">
   <ul class="timeline timeline-snap-icon max-md:timeline-compact timeline-vertical">
-    {#each $appStoreState.notifications as taskDescriptor (taskDescriptor.date)}
+    {#each appStateStore.state.notifications as taskDescriptor (taskDescriptor.date)}
       <li>
         <hr />
         <div class="timeline-middle">

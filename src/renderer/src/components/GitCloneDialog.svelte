@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { appStoreState } from '../state.svelte'
+  import { appStateStore } from '../state.svelte'
 
   let gitCloneDialogue: HTMLDialogElement
 
@@ -12,7 +12,7 @@
 
   function cloneGitRepository(name: string, remote: string, local: string): void {
     cloneJobs += 1
-    $appStoreState.notifications.push({
+    appStateStore.state.notifications.push({
       date: new Date(),
       message: `Began cloning repository ("${name}") from "${remote}" to "${local}"`,
       status: 'Information',
@@ -21,13 +21,13 @@
     window['repo']
       .cloneGitRepository(remote, local)
       .then(() => {
-        $appStoreState.knownRepos.push({
+        appStateStore.state.knownRepos.push({
           name: name,
           remote: remote,
           local: local,
           lastAccessed: new Date()
         })
-        $appStoreState.notifications.push({
+        appStateStore.state.notifications.push({
           date: new Date(),
           message: `Completed cloning repository ("${name}") from "${remote}" to "${local}"`,
           status: 'Information',
@@ -35,7 +35,7 @@
         })
       })
       .catch((err) => {
-        $appStoreState.notifications.push({
+        appStateStore.state.notifications.push({
           date: new Date(),
           message:
             `Failed to clone repository "${name}" from "${remote}" to "${local}" due to following error\n` +
@@ -47,6 +47,7 @@
       .finally(() => {
         cloneJobs -= 1
       })
+    close()
   }
 
   export function open(): void {
