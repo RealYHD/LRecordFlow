@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import path from "path";
 
 const recordMetadataFilename = "record.json"
+const repoConfigurationFilename = "configuration.json"
 const ignoredRecordFolders = [".git"]
 function getRecordPath(localRepoPath: string, recordIdentifier: string): string {
     return path.join(localRepoPath, recordIdentifier)
@@ -99,13 +100,33 @@ export async function setRecord(localRepoPath: string, recordIdentifier: string,
 }
 
 export async function repoExists(localRepoPath: string) {
-    return (await fs.stat(localRepoPath)).isDirectory() && simpleGit({ baseDir: localRepoPath }).checkIsRepo()
+    try {
+        await fs.access(localRepoPath)
+    } catch (error) {
+        return false
+    }
+    return (await fs.stat(localRepoPath)).isDirectory() && (await simpleGit({ baseDir: localRepoPath }).checkIsRepo())
 }
 
 export async function getAllRepoRecords(localRepoPath: string) {
     // TODO Perhaps in the future make this recursive for "nested records"?
-    if (!repoExists(localRepoPath)) return [];
+    if (!await repoExists(localRepoPath)) return [];
     return (await fs.readdir(localRepoPath, { withFileTypes: true })).filter(entry => {
         return entry.isDirectory() && !(ignoredRecordFolders.includes(entry.name))
     }).map((dir) => dir.name)
+}
+
+export async function repoConfigurationExists(localRepoPath: string) {
+    if (!await repoExists(localRepoPath)) return [];
+    try {
+        await fs.access(path.join(localRepoPath, repoConfigurationFilename))
+    } catch (error) {
+        return false
+    }
+    return true
+}
+
+export async function getRepoConfiguration(localRepoPath: string) {
+    if (!await repoExists(localRepoPath) || !await repoConfigurationExists(localRepoPath)) return {};
+    return JSON.parse(await fs.readFile(path.join(localRepoPath, repoConfigurationFilename), 'utf-8'))
 }
