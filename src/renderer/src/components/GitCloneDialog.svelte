@@ -22,15 +22,17 @@
       status: 'Cloning'
     })
     window['repo']
-      .cloneGitRepository(remote, local)
-      .then(() => {
+      .cloneGitRepository(remote, local, name)
+      .then((clonePath: string) => {
         appStateStore.state.notifications.push({
           date: new Date(),
           message: `Completed cloning repository ("${name}") from "${remote}" to "${local}"`,
           status: 'Information',
           title: `Completed cloning "${name}"`
         })
-        appStateStore.state.knownRepos.find((repo) => repo.local == local).status = 'Ready'
+        let repo = appStateStore.state.knownRepos.find((repo) => repo.local == local)
+        repo.status = 'Ready'
+        repo.local = clonePath
       })
       .catch((err) => {
         appStateStore.state.notifications.push({

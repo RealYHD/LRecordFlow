@@ -2,8 +2,8 @@ import simpleGit, { GitResponseError, MergeResult, TaskOptions } from "simple-gi
 import fs from 'fs/promises';
 import path from "path";
 
-export const recordMetadataFilename = "record.json"
-
+const recordMetadataFilename = "record.json"
+const ignoredRecordFolders = [".git"]
 function getRecordPath(localRepoPath: string, recordIdentifier: string): string {
     return path.join(localRepoPath, recordIdentifier)
 }
@@ -12,8 +12,9 @@ function getRecordMetadataPath(localRepoPath: string, recordIdentifier: string):
     return path.join(getRecordPath(localRepoPath, recordIdentifier), recordMetadataFilename)
 }
 
-export async function cloneGitRepository(remoteRepoPath: string, localRepoPath: string) {
-    return await simpleGit({ baseDir: localRepoPath }).clone(remoteRepoPath)
+export async function cloneGitRepository(remoteRepoPath: string, localRepoPath: string, localRepoName: string) {
+    await simpleGit({ baseDir: localRepoPath }).clone(remoteRepoPath, path.join(localRepoPath, localRepoName))
+    return path.join(localRepoPath, localRepoName)
 }
 
 export async function repoHasPendingChanges(localRepoPath: string) {
@@ -27,7 +28,7 @@ export async function repoIsSynced(localRepoPath: string) {
 
 async function merge(localRepoPath: string, options: TaskOptions) {
     try {
-        const mergeSummary = await simpleGit({baseDir: localRepoPath}).merge(options);
+        const mergeSummary = await simpleGit({ baseDir: localRepoPath }).merge(options);
         return mergeSummary.conflicts;
     } catch (err) {
         const mergeSummary: MergeResult = (err as GitResponseError<MergeResult>).git;
@@ -58,11 +59,22 @@ export async function save(localRepoPath: string, modificationNotes: string) {
 
 export async function recordExists(localRepoPath: string, recordIdentifier: string): Promise<boolean> {
     let recordDirectory = getRecordPath(localRepoPath, recordIdentifier)
+    try {
+        await fs.access(recordDirectory)
+    } catch (error) {
+        return false
+    }
     return (await (fs.stat(recordDirectory))).isDirectory()
 }
 
 export async function recordHasMetadata(localRepoPath: string, recordIdentifier: string): Promise<boolean> {
-    return (await (fs.stat(getRecordMetadataPath(localRepoPath, recordIdentifier)))).isFile()
+    let metadataPath = getRecordMetadataPath(localRepoPath, recordIdentifier)
+    try {
+        await fs.access(metadataPath)
+    } catch (error) {
+        return false
+    }
+    return (await (fs.stat(metadataPath))).isFile()
 }
 
 export async function createRecord(localRepoPath: string, recordIdentifier: string) {
@@ -75,8 +87,8 @@ export async function deleteRecord(localRepoPath: string, recordIdentifier: stri
     return await fs.rm(getRecordPath(localRepoPath, recordIdentifier), { recursive: true, force: true })
 }
 
-export async function getRecord(localRepoPath: string, recordIdentifier: string) {
-    if (!await recordExists(localRepoPath, recordIdentifier)) return {}
+export async function getRecordMetadata(localRepoPath: string, recordIdentifier: string) {
+    if (!(await recordExists(localRepoPath, recordIdentifier)) || !(await recordHasMetadata(localRepoPath, recordIdentifier))) return {}
     if (await recordHasMetadata(localRepoPath, recordIdentifier)) {
         return JSON.parse(await fs.readFile(getRecordMetadataPath(localRepoPath, recordIdentifier), 'utf-8'))
     }
@@ -87,10 +99,13 @@ export async function setRecord(localRepoPath: string, recordIdentifier: string,
 }
 
 export async function repoExists(localRepoPath: string) {
-    return (await fs.stat(localRepoPath)).isDirectory() && simpleGit({baseDir: localRepoPath}).checkIsRepo()
+    return (await fs.stat(localRepoPath)).isDirectory() && simpleGit({ baseDir: localRepoPath }).checkIsRepo()
 }
 
 export async function getAllRepoRecords(localRepoPath: string) {
+    // TODO Perhaps in the future make this recursive for "nested records"?
     if (!repoExists(localRepoPath)) return [];
-    return (await fs.readdir(localRepoPath, { withFileTypes: true })).filter(entry => entry.isDirectory())
+    return (await fs.readdir(localRepoPath, { withFileTypes: true })).filter(entry => {
+        return entry.isDirectory() && !(ignoredRecordFolders.includes(entry.name))
+    }).map((dir) => dir.name)
 }
