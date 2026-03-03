@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { Grid, Toolbar } from '@svar-ui/svelte-grid'
+  import { Grid, Toolbar, type IColumnConfig, type IRow } from '@svar-ui/svelte-grid'
   import { appStateStore } from '../../state.svelte'
   import { SvelteSet } from 'svelte/reactivity'
 
   async function loadRecords(): Promise<{
-    columns: Record<string, string>[]
-    records: Record<string, string>[]
+    columns: IColumnConfig[]
+    records: IRow[]
   }> {
     let localRepoPath: string = appStateStore.state.activeRepository.local
-    let records: Record<string, string>[] = []
-    let columns: Record<string, string>[] = []
+    let columns: IColumnConfig[] = []
+    let records: IRow[] = []
     let includedColumnIds = new SvelteSet()
     let recordNames: string[] = await window['repo'].getAllRepoRecords(localRepoPath)
     for (const recordName of recordNames) {
@@ -24,8 +24,20 @@
         includedColumnIds.add(key)
         columns.push({
           id: key,
-          header: key,
-          resize: 'true'
+          header: [
+            key,
+            {
+              filter: {
+                type: 'text', // Type of filter
+                config: {
+                  icon: 'wxi-search', // Optional icon for the filter input
+                  clear: true // Allow clearing the input
+                }
+              }
+            }
+          ],
+          resize: true,
+          sort: true
         })
       }
     }
@@ -35,8 +47,8 @@
 </script>
 
 {#await loadRecords() then { columns, records }}
-  <div class="container">
-    <Toolbar api={gridApi} />
-    <Grid bind:this={gridApi} data={records} {columns} reorder={true} />
-  </div>
+<div class="container">
+  <Toolbar api={gridApi} />
+  <Grid bind:this={gridApi} data={records} {columns} reorder={true} />
+</div>
 {/await}
