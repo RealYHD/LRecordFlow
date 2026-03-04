@@ -9,10 +9,13 @@
     Button
   } from 'flowbite-svelte'
   import { Router } from 'sv-router'
-  import { p, route } from './lib/router'
-  import { appStateStore, flush, load } from './state.svelte'
+  import { p, route } from './lib/router.svelte'
+  import { flush, load } from './lib/state.svelte'
+  import { onMount } from 'svelte'
 
-  load()
+  onMount(() => {
+    load()
+  })
 </script>
 
 <svelte:window onbeforeunload={() => flush()} />
@@ -24,10 +27,7 @@
     >
   </NavBrand>
 
-  {#if route.params['repository']}
-    {appStateStore.state.knownRepos.find((repo) => repo.local == route.params.repository)
-      ? appStateStore.state.knownRepos.find((repo) => repo.local == route.params.repository).name
-      : 'No Repo Selected'}
+  {#if route.params.repository}
     <ButtonGroup>
       <Button>Save</Button>
       <Button>Configuration</Button>
@@ -42,6 +42,4 @@
   </NavUl>
 </Navbar>
 
-<div class="flex-1 max-w-full overflow-clip">
-  <Router />
-</div>
+<Router />

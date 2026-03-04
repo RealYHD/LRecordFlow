@@ -6,17 +6,17 @@
     FolderArrowRightOutline,
     TrashBinOutline
   } from 'flowbite-svelte-icons'
-  import { appStateStore } from '../state.svelte'
+  import { appStateStore } from '../lib/state.svelte'
   import GitCloneModal from './GitCloneDialog.svelte'
-  import { navigate } from '../lib/router'
+  import { navigate } from '../lib/router.svelte'
   let gitCloneModalOpen = $state(false)
 </script>
 
 <GitCloneModal bind:modalOpen={gitCloneModalOpen} />
-<div class="p-4">
+<div class="p-4 overflow-y-auto">
   <h1 class="text-3xl mb-4">Repositories</h1>
-  <div class="flex">
-    <Card class="m-1 p-4 sm:p-6  md:p-8 w-72">
+  <div class="flex flex-wrap">
+    <Card class="m-1 p-4 sm:p-6  md:p-8 w-90 min-w-90">
       <div class="flex flex-col h-full justify-between">
         <div>
           <FileCloneOutline class="shrink-0 h-8 w-8" />
@@ -27,14 +27,14 @@
             Clone a repository from a remote location for viewing and editing.
           </p>
         </div>
-        <ButtonGroup>
+        <ButtonGroup class="w-fit">
           <Button onclick={() => (gitCloneModalOpen = true)}>Clone</Button>
           <Button>Add</Button>
         </ButtonGroup>
       </div>
     </Card>
     {#each appStateStore.state.knownRepos as repo (repo.local)}
-      <Card class="m-1 p-4 sm:p-6 md:p-8">
+      <Card class="m-1 p-4 sm:p-6 md:p-8 w-90 min-w-90">
         <DatabaseOutline class="shrink-0 h-8 w-8" />
         <h2 class="my-2 text-2xl tracking-tight text-gray-900 dark:text-white">
           {repo.name}
@@ -49,9 +49,9 @@
         </ul>
         <ButtonGroup class="w-fit">
           <Button
-            onclick={() =>
-              navigate('/:repository/relational', { params: { repository: repo.local } })}
-            >Open</Button
+            onclick={() => {
+              navigate('/:repository/relational', { params: { repository: repo.local } })
+            }}>Open</Button
           >
           <Button><TrashBinOutline class="shrink-0" /></Button>
           <Button><FolderArrowRightOutline class="shrink-0" /></Button>

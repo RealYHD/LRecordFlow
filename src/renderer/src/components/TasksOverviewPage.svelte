@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { appStateStore } from '../state.svelte'
+  import { appStateStore } from '../lib/state.svelte'
 </script>
 
 <div class="container px-5 mx-auto max-w-full">

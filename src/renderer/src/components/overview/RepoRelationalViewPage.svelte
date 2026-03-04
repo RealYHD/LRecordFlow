@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { route } from '../../lib/router'
+  import { route } from '../../lib/router.svelte'
   import { DataTable } from 'simple-datatables'
-  import { findColumns, loadRecords } from '../../lib/repo'
+  import { findColumns, loadRecords } from '../../lib/repo.svelte'
 
   const tableOptions = {
-    tableRender: (_data: [], table, type: string) => {
-      if (type === 'print') {
-        return table
+    tableRender: (_data: [], _table, _type: string) => {
+      if (_type === 'print') {
+        return _table
       }
 
-      const tHead = table.childNodes[0]
+      const tHead = _table.childNodes[0]
       const filterHeaders = {
         nodeName: 'TR',
         attributes: {
@@ -32,7 +32,7 @@
       }
 
       tHead.childNodes.push(filterHeaders)
-      return table
+      return _table
     }
   }
 
@@ -62,6 +62,9 @@
   })
 </script>
 
-<div class="px-4">
-  <table bind:this={table}></table>
+<div>
+  <table bind:this={table} class="w-full"></table>
 </div>
+
+<style>
+</style>
