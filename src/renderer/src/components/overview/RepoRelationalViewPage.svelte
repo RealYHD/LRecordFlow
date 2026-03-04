@@ -1,70 +1,48 @@
 <script lang="ts">
   import { route } from '../../lib/router.svelte'
-  import { DataTable } from 'simple-datatables'
   import { findColumns, loadRecords } from '../../lib/repo.svelte'
+  import {
+    Table,
+    TableBody,
+    TableBodyCell,
+    TableBodyRow,
+    TableHead,
+    TableHeadCell
+  } from 'flowbite-svelte'
 
-  const tableOptions = {
-    tableRender: (_data: [], _table, _type: string) => {
-      if (_type === 'print') {
-        return _table
-      }
+  const cols: [string, string[]][] = $state([])
+  const rows: Record<string, string>[] = $state([])
 
-      const tHead = _table.childNodes[0]
-      const filterHeaders = {
-        nodeName: 'TR',
-        attributes: {
-          class: 'search-filtering-row'
-        },
-        childNodes: tHead.childNodes[0].childNodes.map((_th, index: number) => ({
-          nodeName: 'TH',
-          childNodes: [
-            {
-              nodeName: 'INPUT',
-              attributes: {
-                class: 'datatable-input',
-                type: 'search',
-                placeholder: 'Filter',
-                'data-columns': `[${index}]`
-              }
-            }
-          ]
-        }))
-      }
-
-      tHead.childNodes.push(filterHeaders)
-      return _table
-    }
-  }
-
-  let table: HTMLTableElement
-  let dataTable: DataTable = $derived(new DataTable(table, tableOptions))
   loadRecords(route.params.repository).then((records) => {
     findColumns(records).then((columns) => {
-      console.log(columns)
-      for (const columnName in columns) {
-        if (!Object.hasOwn(columns, columnName)) continue
-        const columnValues = columns[columnName]
-        dataTable.columns.add({
-          heading: columnName,
-          type: 'string',
-          data: columnValues
-        })
-      }
-      for (const record of records) {
-        for (const columnName in columns) {
-          if (!Object.hasOwn(columns, columnName)) continue
-          if (!Object.hasOwn(record, columnName)) record[columnName] = 'N/A'
-        }
-        console.log(record)
-      }
-      dataTable.insert(records)
+      cols.push(...columns)
     })
+    rows.push(...records)
   })
+  $inspect(cols).with(console.log)
+  $inspect(rows).with(console.log)
 </script>
 
-<div>
-  <table bind:this={table} class="w-full"></table>
+<div class="w-full h-full px-4">
+  <Table hoverable={true} border={true} shadow>
+    <caption
+      class="bg-white p-5 text-left text-lg font-semibold text-gray-900 dark:bg-gray-800 dark:text-white"
+    >
+      Records
+    </caption>
+    <TableHead>
+      {#each cols as [colName] (colName)}
+        <TableHeadCell>{colName}</TableHeadCell>
+      {/each}
+    </TableHead>
+    <TableBody>
+      {#each rows as row (row['Identifier'])}
+        <TableBodyRow>
+          {#each cols as [colName] (colName)}
+            <TableBodyCell>{row[colName]}</TableBodyCell>
+          {/each}
+        </TableBodyRow>
+      {/each}
+    </TableBody>
+  </Table>
 </div>
-
-<style>
-</style>

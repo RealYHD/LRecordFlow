@@ -42,4 +42,6 @@
   </NavUl>
 </Navbar>
 
-<Router />
+<div class="flex-1">
+  <Router />
+</div>

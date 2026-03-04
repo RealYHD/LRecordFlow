@@ -14,7 +14,7 @@ export async function loadRecords(localRepoPath: string): Promise<Record<string,
     return records
 }
 
-export async function findColumns(records: Record<string, string>[]): Promise<Record<string, string[]>> {
+export async function findColumns(records: Record<string, string>[]): Promise<[string, string[]][]> {
     let columns: Record<string, string[]> = {}
     columns['Identifier'] = []
     for (const record of records) {
@@ -28,8 +28,9 @@ export async function findColumns(records: Record<string, string>[]): Promise<Re
             columns[key].push(element)
         }
     }
-    return columns
+    return Object.entries(columns).map(([colName, colValues]) => [colName, colValues])
 }
+
 
 export function cloneGitRepository(name: string, remote: string, local: string): void {
     appStateStore.state.notifications.push({
