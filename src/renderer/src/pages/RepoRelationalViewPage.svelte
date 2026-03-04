@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { route } from '../../lib/router.svelte'
-  import { findColumns, loadRecords } from '../../lib/repo.svelte'
+  import { route } from '../lib/router.svelte'
+  import { findColumns, loadRecords } from '../lib/repo.svelte'
   import {
     Table,
     TableBody,

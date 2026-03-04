@@ -7,7 +7,7 @@
     TrashBinOutline
   } from 'flowbite-svelte-icons'
   import { appStateStore } from '../lib/state.svelte'
-  import GitCloneModal from './GitCloneModal.svelte'
+  import GitCloneModal from '../components/GitCloneModal.svelte'
   import { navigate } from '../lib/router.svelte'
   let gitCloneModalOpen = $state(false)
 </script>
