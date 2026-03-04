@@ -10,12 +10,6 @@ export interface Repository {
     status: "Ready" | "Not Ready"
 }
 
-export interface Record {
-    repository: Repository
-    path: string
-}
-
-
 export interface AppState {
     knownRepos: Repository[]
     notifications: NotificationDescriptor[]

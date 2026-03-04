@@ -14,7 +14,7 @@ export async function loadRecords(localRepoPath: string): Promise<Record<string,
     return records
 }
 
-export async function findColumns(records: Record<string, string>[]): Promise<[string, string[]][]> {
+export function findColumns(records: Record<string, string>[]): [string, string[]][] {
     let columns: Record<string, string[]> = {}
     columns['Identifier'] = []
     for (const record of records) {
@@ -70,6 +70,10 @@ export function cloneGitRepository(name: string, remote: string, local: string):
             })
             appStateStore.state.knownRepos.find((repo) => repo.local == local).status = 'Not Ready'
         })
+}
+
+export async function setRecord(localRepoPath: string, recordIdentifier: string, recordData: Record<string, string>) {
+    window['repo'].setRecord(localRepoPath, recordIdentifier, recordData)
 }
 
 // TODO manually IPC necessary functions and add a "receiver" on this end instead of using the IPC indexer.

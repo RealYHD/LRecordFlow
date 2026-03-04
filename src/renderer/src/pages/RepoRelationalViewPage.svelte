@@ -1,6 +1,6 @@
 <script lang="ts">
   import { route } from '../lib/router.svelte'
-  import { findColumns, loadRecords } from '../lib/repo.svelte'
+  import { findColumns as findColumnsFromRecords, loadRecords } from '../lib/repo.svelte'
   import {
     Table,
     TableBody,
@@ -9,19 +9,28 @@
     TableHead,
     TableHeadCell
   } from 'flowbite-svelte'
+  import EditRecordModal from '../components/EditRecordModal.svelte'
 
-  const cols: [string, string[]][] = $state([])
+  const localRepoPath = route.params.repository
   const rows: Record<string, string>[] = $state([])
-
-  loadRecords(route.params.repository).then((records) => {
-    findColumns(records).then((columns) => {
-      cols.push(...columns)
-    })
+  const cols: [string, string[]][] = $derived(findColumnsFromRecords(rows))
+  let editingRecordData: Record<string, string> = $state({ Identifier: '' })
+  let editModalOpen = $state(false)
+  loadRecords(localRepoPath).then((records) => {
     rows.push(...records)
   })
-  $inspect(cols).with(console.log)
-  $inspect(rows).with(console.log)
+
+  function edit(record: Record<string, string>): void {
+    editingRecordData = record
+    editModalOpen = true
+  }
 </script>
+
+<EditRecordModal
+  bind:modalOpen={editModalOpen}
+  {localRepoPath}
+  bind:recordData={editingRecordData}
+/>
 
 <div class="w-full h-full px-4">
   <Table hoverable={true} border={true} shadow>
@@ -37,7 +46,7 @@
     </TableHead>
     <TableBody>
       {#each rows as row (row['Identifier'])}
-        <TableBodyRow>
+        <TableBodyRow ondblclick={() => edit(row)}>
           {#each cols as [colName] (colName)}
             <TableBodyCell>{row[colName]}</TableBodyCell>
           {/each}

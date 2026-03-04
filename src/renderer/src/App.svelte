@@ -9,7 +9,7 @@
     Button
   } from 'flowbite-svelte'
   import { Router } from 'sv-router'
-  import { p, route } from './lib/router.svelte'
+  import { navigate, p, route } from './lib/router.svelte'
   import { flush, load } from './lib/state.svelte'
   import { onMount } from 'svelte'
 
@@ -29,8 +29,21 @@
 
   {#if route.params.repository}
     <ButtonGroup>
-      <Button>Save</Button>
-      <Button>Configuration</Button>
+      <Button
+        onclick={() =>
+          navigate('/:repository/relational', { params: { repository: route.params.repository } })}
+        >View</Button
+      >
+      <Button
+        onclick={() =>
+          navigate('/:repository/save', { params: { repository: route.params.repository } })}
+        >Save</Button
+      >
+      <Button
+        onclick={() =>
+          navigate('/:repository/configure', { params: { repository: route.params.repository } })}
+        >Configuration</Button
+      >
     </ButtonGroup>
   {/if}
 

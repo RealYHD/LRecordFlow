@@ -95,8 +95,8 @@ export async function getRecordMetadata(localRepoPath: string, recordIdentifier:
     }
 }
 
-export async function setRecord(localRepoPath: string, recordIdentifier: string, record: object) {
-    return await fs.writeFile(getRecordMetadataPath(localRepoPath, recordIdentifier), JSON.stringify(record))
+export async function setRecord(localRepoPath: string, recordIdentifier: string, recordData: object) {
+    return await fs.writeFile(getRecordMetadataPath(localRepoPath, recordIdentifier), JSON.stringify(recordData))
 }
 
 export async function repoExists(localRepoPath: string) {
