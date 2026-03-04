@@ -17,9 +17,6 @@ export interface Record {
 
 
 export interface AppState {
-    activeRepository: Repository | null
-    activeRecord: Record | null
-    activeRepoView: "Relational" | "Itemized"
     knownRepos: Repository[]
     notifications: NotificationDescriptor[]
 }

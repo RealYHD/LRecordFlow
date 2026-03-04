@@ -1,54 +1,67 @@
 <script lang="ts">
-  import { Grid, Toolbar, type IColumnConfig, type IRow } from '@svar-ui/svelte-grid'
-  import { appStateStore } from '../../state.svelte'
-  import { SvelteSet } from 'svelte/reactivity'
+  import { route } from '../../lib/router'
+  import { DataTable } from 'simple-datatables'
+  import { findColumns, loadRecords } from '../../lib/repo'
 
-  async function loadRecords(): Promise<{
-    columns: IColumnConfig[]
-    records: IRow[]
-  }> {
-    let localRepoPath: string = appStateStore.state.activeRepository.local
-    let columns: IColumnConfig[] = []
-    let records: IRow[] = []
-    let includedColumnIds = new SvelteSet()
-    let recordNames: string[] = await window['repo'].getAllRepoRecords(localRepoPath)
-    for (const recordName of recordNames) {
-      let recordMetadata: Record<string, string> = await window['repo'].getRecordMetadata(
-        localRepoPath,
-        recordName
-      )
-      recordMetadata['id'] = recordName
-      records.push(recordMetadata)
-      for (const key in recordMetadata) {
-        if (includedColumnIds.has(key)) continue
-        includedColumnIds.add(key)
-        columns.push({
-          id: key,
-          header: [
-            key,
+  const tableOptions = {
+    tableRender: (_data: [], table, type: string) => {
+      if (type === 'print') {
+        return table
+      }
+
+      const tHead = table.childNodes[0]
+      const filterHeaders = {
+        nodeName: 'TR',
+        attributes: {
+          class: 'search-filtering-row'
+        },
+        childNodes: tHead.childNodes[0].childNodes.map((_th, index: number) => ({
+          nodeName: 'TH',
+          childNodes: [
             {
-              filter: {
-                type: 'text', // Type of filter
-                config: {
-                  icon: 'wxi-search', // Optional icon for the filter input
-                  clear: true // Allow clearing the input
-                }
+              nodeName: 'INPUT',
+              attributes: {
+                class: 'datatable-input',
+                type: 'search',
+                placeholder: 'Filter',
+                'data-columns': `[${index}]`
               }
             }
-          ],
-          resize: true,
-          sort: true
+          ]
+        }))
+      }
+
+      tHead.childNodes.push(filterHeaders)
+      return table
+    }
+  }
+
+  let table: HTMLTableElement
+  let dataTable: DataTable = $derived(new DataTable(table, tableOptions))
+  loadRecords(route.params.repository).then((records) => {
+    findColumns(records).then((columns) => {
+      console.log(columns)
+      for (const columnName in columns) {
+        if (!Object.hasOwn(columns, columnName)) continue
+        const columnValues = columns[columnName]
+        dataTable.columns.add({
+          heading: columnName,
+          type: 'string',
+          data: columnValues
         })
       }
-    }
-    return { columns, records }
-  }
-  let gridApi
+      for (const record of records) {
+        for (const columnName in columns) {
+          if (!Object.hasOwn(columns, columnName)) continue
+          if (!Object.hasOwn(record, columnName)) record[columnName] = 'N/A'
+        }
+        console.log(record)
+      }
+      dataTable.insert(records)
+    })
+  })
 </script>
 
-{#await loadRecords() then { columns, records }}
-<div class="container">
-  <Toolbar api={gridApi} />
-  <Grid bind:this={gridApi} data={records} {columns} reorder={true} />
+<div class="px-4">
+  <table bind:this={table}></table>
 </div>
-{/await}

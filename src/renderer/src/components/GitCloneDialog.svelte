@@ -1,11 +1,10 @@
 <script lang="ts">
+  import { Button, ButtonGroup, Input, InputAddon, Label, Modal } from 'flowbite-svelte'
   import { appStateStore } from '../state.svelte'
 
-  let gitCloneDialogue: HTMLDialogElement
-
-  let nameInput: HTMLInputElement
-  let remoteInput: HTMLInputElement
-  let localInput: HTMLInputElement
+  let nameInputValue: string = $state('')
+  let remoteInputValue: string = $state('')
+  let localInputValue: string = $state('')
 
   function cloneGitRepository(name: string, remote: string, local: string): void {
     appStateStore.state.notifications.push({
@@ -48,56 +47,58 @@
     close()
   }
 
-  export function open(): void {
-    gitCloneDialogue.showModal()
-  }
-
-  export function close(): void {
-    gitCloneDialogue.close()
-  }
+  let { modalOpen = $bindable() } = $props()
 </script>
 
-<dialog bind:this={gitCloneDialogue} id="gitCloneDialogue" class="modal">
-  <fieldset class="fieldset bg-base-200 border-base-300 rounded-box w-xs border p-4 modal-box">
-    <legend class="fieldset-legend">Clone Repository</legend>
-    <label for="repositoryName" class="label">Repository Name</label>
-    <input
-      bind:this={nameInput}
+<Modal class="w-80" form bind:open={modalOpen}>
+  <div class="mb-3">
+    <h2 class="text-2xl">Clone Repository</h2>
+  </div>
+  <div>
+    <Label for="repositoryName">Repository Name</Label>
+    <Input
       id="repositoryName"
       type="text"
       class="input"
       placeholder="Repository"
+      bind:value={nameInputValue}
     />
-
-    <label for="gitRepositoryUrl" class="label">Git Repository URL</label>
-    <input
-      bind:this={remoteInput}
+  </div>
+  <div>
+    <Label for="gitRepositoryUrl">Git Repository URL</Label>
+    <Input
       id="gitRepositoryUrl"
       type="text"
       class="input"
       placeholder="ssh://git@repo"
+      bind:value={remoteInputValue}
     />
-    <label for="localRepositoryPath" class="label">Local Repository Path</label>
-    <div class="join">
-      <input
-        bind:this={localInput}
+  </div>
+  <div>
+    <Label for="localRepositoryPath">Local Repository Path</Label>
+    <ButtonGroup class="w-full">
+      <Input
         id="localRepositoryPath"
         type="text"
         class="input join-item"
         placeholder="/home/me/repository"
+        bind:value={localInputValue}
       />
-      <button
-        class="btn join-item"
-        onclick={() =>
-          window['dialog'].handleDirectoryOpen().then((path) => (localInput.value = path))}
-        >Select</button
-      >
-    </div>
-    <button
-      class="btn btn-neutral mt-4"
-      onclick={() => cloneGitRepository(nameInput.value, remoteInput.value, localInput.value)}
-      >Clone Repository</button
-    >
-    <button class="btn btn-ghost" onclick={() => gitCloneDialogue.close()}>Cancel</button>
-  </fieldset>
-</dialog>
+      <InputAddon>
+        <Button
+          class="btn join-item"
+          onclick={() =>
+            window['dialog'].handleDirectoryOpen().then((path) => (localInputValue = path))}
+          >Select</Button
+        >
+      </InputAddon>
+    </ButtonGroup>
+  </div>
+  <Button
+    class="btn btn-neutral mt-4"
+    onclick={() => {
+      cloneGitRepository(nameInputValue, remoteInputValue, localInputValue)
+      modalOpen = false
+    }}>Clone Repository</Button
+  >
+</Modal>

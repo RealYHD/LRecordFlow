@@ -2,9 +2,7 @@ import { type AppState, type Repository } from "./entities";
 
 export const appStateStore: { state: AppState } = $state({
     state: {
-        activeRepository: null,
-        activeRecord: null,
-        activeRepoView: 'Relational',
+        preferredRepoView: 'Relational',
         knownRepos: [],
         notifications: []
     }
