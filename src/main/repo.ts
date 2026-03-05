@@ -1,5 +1,5 @@
 import simpleGit, { GitResponseError, MergeResult, TaskOptions } from "simple-git";
-import fs from 'fs/promises';
+import fs, { mkdir } from 'fs/promises';
 import path from "path";
 
 const recordMetadataFilename = "record.json"
@@ -88,14 +88,16 @@ export async function deleteRecord(localRepoPath: string, recordIdentifier: stri
     return await fs.rm(getRecordPath(localRepoPath, recordIdentifier), { recursive: true, force: true })
 }
 
-export async function getRecordMetadata(localRepoPath: string, recordIdentifier: string) {
+export async function getRecordMetadata(localRepoPath: string, recordIdentifier: string): Promise<Record<string, string>> {
     if (!(await recordExists(localRepoPath, recordIdentifier)) || !(await recordHasMetadata(localRepoPath, recordIdentifier))) return {}
     if (await recordHasMetadata(localRepoPath, recordIdentifier)) {
         return JSON.parse(await fs.readFile(getRecordMetadataPath(localRepoPath, recordIdentifier), 'utf-8'))
     }
+    return {}
 }
 
 export async function setRecord(localRepoPath: string, recordIdentifier: string, recordData: object) {
+    await mkdir(path.join(localRepoPath, recordIdentifier), { recursive: true })
     return await fs.writeFile(getRecordMetadataPath(localRepoPath, recordIdentifier), JSON.stringify(recordData))
 }
 

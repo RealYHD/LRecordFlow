@@ -76,4 +76,42 @@ export async function setRecord(localRepoPath: string, recordIdentifier: string,
     window['repo'].setRecord(localRepoPath, recordIdentifier, recordData)
 }
 
+export function validateRecords(records: Record<string, string>[], columnTypes: Record<string, string[]> = null) {
+    let issuesCount = 0
+    let recordValidationResults: Record<string, string[]>[] = []
+    for (const record of records) {
+        let recordValidationResult: Record<string, string[]> = {}
+        recordValidationResults.push(recordValidationResult)
+        if (columnTypes != null) {
+            for (const columnName in columnTypes) {
+                if (!Object.hasOwn(columnTypes, columnName)) continue;
+
+                const acceptableValues = columnTypes[columnName];
+                recordValidationResult[columnName] = []
+                if (record[columnName]) {
+                    if (!acceptableValues.includes(record[columnName])) {
+                        recordValidationResult[columnName].push(`"${record[columnName]}" is not an acceptable value for column "${columnName}".`)
+                        issuesCount += 1
+                    }
+                } else {
+                    recordValidationResult[columnName].push(`Missing value for column "${columnName}".`)
+                    issuesCount += 1
+                }
+            }
+        }
+    }
+    return { issues: recordValidationResults, issuesCount }
+}
+
+export function validateRecordIdentifier(identifier: string, allIdentifiers: string[]) {
+    // TODO validate that it is a valid path
+    if (!identifier) {
+        return "Identifier cannot be blank"
+    }
+    if (allIdentifiers.includes(identifier)) {
+        return "Identifier is already in use"
+    }
+    return ''
+}
+
 // TODO manually IPC necessary functions and add a "receiver" on this end instead of using the IPC indexer.
