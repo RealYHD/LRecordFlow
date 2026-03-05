@@ -23,16 +23,21 @@
     TableHeadCell
   } from 'flowbite-svelte'
   import EditRecordModal from '../components/EditRecordModal.svelte'
-  import { ExclamationCircleOutline } from 'flowbite-svelte-icons'
+  import {
+    CheckCircleOutline,
+    ExclamationCircleOutline,
+    FloppyDiskAltOutline
+  } from 'flowbite-svelte-icons'
   import { onMount } from 'svelte'
   import { SvelteMap } from 'svelte/reactivity'
 
-  const saveDelay = 10
+  const saveDelay = 5
+  const saveTickInterval = 100
   const savedRecordData: Record<string, Record<string, string>> = $state({})
   const localRepoPath = route.params.repository
   const liveRecordData: Record<string, string>[] = $state([])
   const modifiedRecords: string[] = $derived(calcModifiedRecords(liveRecordData, savedRecordData))
-  const recordFlushTimers: Map<string, number> = new SvelteMap()
+  const recordFlushTimers: Record<string, number> = $state({})
   const rows: Record<string, string>[] = $derived(liveRecordData) // TODO do something with this...
   const cols: [string, string[]][] = $derived(findColumnsFromRecords(liveRecordData))
   const identifiers = $derived(liveRecordData.map((record) => record['Identifier']))
@@ -89,28 +94,21 @@
   function flushTick(): void {
     // In case something was modified and returned, this removes any dangling timers that aren't ticked
     for (const identifier in recordFlushTimers) {
-      if (!modifiedRecords.includes(identifier)) recordFlushTimers.delete(identifier)
+      if (!modifiedRecords.includes(identifier)) delete recordFlushTimers[identifier]
     }
     for (const identifier of modifiedRecords) {
-      console.log($state.snapshot(modifiedRecords))
-      console.log($state.snapshot(recordFlushTimers))
-      if (!recordFlushTimers.has(identifier)) {
-        console.log('setting timer')
+      if (!Object.hasOwn(recordFlushTimers, identifier)) {
         recordFlushTimers[identifier] = saveDelay
       } else {
-        recordFlushTimers[identifier] -= recordFlushTimers[identifier] < 0 ? 0 : 1
+        recordFlushTimers[identifier] -=
+          recordFlushTimers[identifier] <= 0 ? 0 : saveTickInterval / 1000
       }
-      console.log(`Ticking ${identifier}: ${recordFlushTimers[identifier]}`)
-      if (recordFlushTimers[identifier] == 0) {
+      if (recordFlushTimers[identifier] <= 0) {
         flushRecord(
           $state.snapshot(
             liveRecordData.find((liveRecord) => liveRecord['Identifier'] == identifier)
           )
         )
-      }
-      if (recordFlushTimers[identifier] < 0) {
-        console.log('delete')
-        recordFlushTimers.delete(identifier)
       }
     }
   }
@@ -118,8 +116,6 @@
   function flushRecord(modifiedRecord: Record<string, string>): void {
     setRecord(localRepoPath, modifiedRecord['Identifier'], modifiedRecord)
     savedRecordData[modifiedRecord['Identifier']] = modifiedRecord
-    console.log(`Flushed ${modifiedRecord['Identifier']}`)
-    console.log($state.snapshot(savedRecordData))
   }
 
   function loadRecords(): void {
@@ -129,14 +125,11 @@
       for (const loadedRecord of loadedRecords) {
         savedRecordData[loadedRecord['Identifier']] = loadedRecord
       }
-      console.log('load')
-      console.log($state.snapshot(savedRecordData))
-      console.log($state.snapshot(liveRecordData))
     })
   }
   onMount(() => {
     loadRecords()
-    setInterval(flushTick, 1000)
+    setInterval(flushTick, saveTickInterval)
   })
 </script>
 
@@ -156,7 +149,8 @@
   <div>
     <Table hoverable={true} border={true} shadow>
       <TableHead>
-        <TableHeadCell><Checkbox /></TableHeadCell>
+        <TableHeadCell><FloppyDiskAltOutline class="shrink-0" /></TableHeadCell>
+        <TableHeadCell class="w-fit"><Checkbox /></TableHeadCell>
         {#each cols as [colName] (colName)}
           <TableHeadCell>{colName}</TableHeadCell>
         {/each}
@@ -164,27 +158,27 @@
       <TableBody>
         {#each rows as row, rowIndex (row['Identifier'])}
           <TableBodyRow class="border-gray-200" ondblclick={() => editRecord(row)}>
+            <TableBodyCell>
+              <!-- TODO fix the alignment issue here -->
+              <Progressradial
+                progress={recordFlushTimers[row['Identifier']]
+                  ? 100 * ((saveDelay - recordFlushTimers[row['Identifier']]) / saveDelay)
+                  : 100}
+                class="h-5 w-5"
+                color="gray"
+              />
+            </TableBodyCell>
             <TableBodyCell><Checkbox /></TableBodyCell>
             {#each cols as [colName], colIndex (colName)}
               <TableBodyCell>
                 <div class="flex">
-                  {#if colName == 'Identifier'}
-                    {#if Object.hasOwn(recordFlushTimers, row['Identifier'])}
-                      <Span>
-                        <Progressradial
-                          progress={100 * (recordFlushTimers[row['Identifier']] / saveDelay)}
-                        />
-                      </Span>
-                    {/if}
-                  {/if}
+                  {#if colName == 'Identifier'}{/if}
                   {#if issues[rowIndex][colName] && issues[rowIndex][colName].length}
-                    <Span class="inline">
-                      <ExclamationCircleOutline
-                        color="red"
-                        class="shrink-0"
-                        id={`table-issue-${rowIndex}-${colIndex}`}
-                      />
-                    </Span>
+                    <ExclamationCircleOutline
+                      color="red"
+                      class="shrink-0"
+                      id={`table-issue-${rowIndex}-${colIndex}`}
+                    />
                     <Popover triggeredBy={`#table-issue-${rowIndex}-${colIndex}`}>
                       <ul>
                         {#each issues[rowIndex][colName] as issue (issue)}
