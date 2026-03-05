@@ -7,7 +7,8 @@
     loadRecords as loadRecordsFromStorage,
     setRecord,
     validateRecordIdentifier,
-    validateRecords
+    validateRecords,
+    type RepositoryRecordData
   } from '../lib/repo.svelte'
   import {
     Button,
@@ -35,15 +36,15 @@
 
   const saveDelay = 2
   const saveTickInterval = 100
-  const savedRecordData: Record<string, Record<string, string>> = $state({})
+  const savedRecordData: Record<string, RepositoryRecordData> = $state({})
   const localRepoPath = route.params.repository
-  let liveRecordData: Record<string, string>[] = $state([])
+  let liveRecordData: RepositoryRecordData[] = $state([])
   const modifiedRecords: [string, number][] = $derived(
     calcModifiedRecords(liveRecordData, savedRecordData)
   )
   const recordFlushTimers: Record<string, [number, string]> = $state({})
   let unsavedRecordsCount: number = $derived(Object.keys(recordFlushTimers).length)
-  const rows: Record<string, string>[] = $derived(liveRecordData) // TODO do something with this...
+  const rows: RepositoryRecordData[] = $derived(liveRecordData) // TODO do something with this...
   const cols: [string, string[]][] = $derived(findColumnsFromRecords(liveRecordData))
   const identifiers = $derived(liveRecordData.map((record) => record['Identifier']))
   let liveRecordIssues = $derived(validateRecords(liveRecordData))
@@ -85,8 +86,8 @@
   }
 
   function calcModifiedRecords(
-    liveRecords: Record<string, string>[],
-    flushedRecordsSnapshot: Record<string, Record<string, string>>
+    liveRecords: RepositoryRecordData[],
+    flushedRecordsSnapshot: Record<string, RepositoryRecordData>
   ): [string, number][] {
     let changedRecordIdentifiers: [string, number][] = $state([])
     for (const [index, liveRecord] of liveRecords.entries()) {
@@ -136,7 +137,7 @@
     }
   }
 
-  function flushRecord(modifiedRecord: Record<string, string>): void {
+  function flushRecord(modifiedRecord: RepositoryRecordData): void {
     setRecord(localRepoPath, modifiedRecord['Identifier'], modifiedRecord)
     savedRecordData[modifiedRecord['Identifier']] = modifiedRecord
   }

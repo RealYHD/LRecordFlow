@@ -1,10 +1,10 @@
 import { appStateStore } from "./state.svelte"
-
-export async function loadRecords(localRepoPath: string): Promise<Record<string, string>[]> {
-    let records: Record<string, string>[] = []
+export type RepositoryRecordData = Record<string, string>
+export async function loadRecords(localRepoPath: string): Promise<RepositoryRecordData[]> {
+    let records: RepositoryRecordData[] = []
     let recordNames: string[] = await window['repo'].getAllRepoRecords(localRepoPath)
     for (const recordName of recordNames) {
-        let recordMetadata: Record<string, string> = await window['repo'].getRecordMetadata(
+        let recordMetadata: RepositoryRecordData = await window['repo'].getRecordMetadata(
             localRepoPath,
             recordName
         )
@@ -14,7 +14,7 @@ export async function loadRecords(localRepoPath: string): Promise<Record<string,
     return records
 }
 
-export function findColumns(records: Record<string, string>[]): [string, string[]][] {
+export function findColumns(records: RepositoryRecordData[]): [string, string[]][] {
     let columns: Record<string, string[]> = {}
     columns['Identifier'] = []
     for (const record of records) {
@@ -76,11 +76,11 @@ export async function deleteRecord(localRepoPath: string, recordIdentifier: stri
     return await window['repo'].deleteRecord(localRepoPath, recordIdentifier)
 }
 
-export async function setRecord(localRepoPath: string, recordIdentifier: string, recordData: Record<string, string>) {
+export async function setRecord(localRepoPath: string, recordIdentifier: string, recordData: RepositoryRecordData) {
     window['repo'].setRecord(localRepoPath, recordIdentifier, recordData)
 }
 
-export function validateRecords(records: Record<string, string>[], columnTypes: Record<string, string[]> = null) {
+export function validateRecords(records: RepositoryRecordData[], columnTypes: Record<string, string[]> = null) {
     let issues: Record<string, string[]>[] = $state([])
     for (const record of records) {
         issues.push({})

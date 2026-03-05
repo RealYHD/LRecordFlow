@@ -10,6 +10,7 @@
     Span
   } from 'flowbite-svelte'
   import { CirclePlusOutline, TrashBinOutline } from 'flowbite-svelte-icons'
+  import type { RepositoryRecordData } from '../lib/repo.svelte'
 
   let {
     modalOpen = $bindable(false),
@@ -18,7 +19,7 @@
     editRecordIndex = $bindable()
   }: {
     modalOpen: boolean
-    liveRecords: Record<string, string>[]
+    liveRecords: RepositoryRecordData[]
     liveIssues: Record<string, string[]>[]
     editRecordIndex: number
   } = $props()

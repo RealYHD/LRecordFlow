@@ -1,7 +1,3 @@
-export enum RepoView {
-    Relational, Itemized
-}
-
 export interface Repository {
     name: string
     remote: string
@@ -10,17 +6,18 @@ export interface Repository {
     status: "Ready" | "Not Ready"
 }
 
-export interface AppState {
-    knownRepos: Repository[]
-    notifications: NotificationDescriptor[]
-}
-
 export interface NotificationDescriptor {
     title: string
     date: Date
     status: "Information" | "Alert"
     message: string
 }
+
+export interface AppState {
+    knownRepos: Repository[]
+    notifications: NotificationDescriptor[]
+}
+
 
 export const appStateStore: { state: AppState } = $state({
     state: {
