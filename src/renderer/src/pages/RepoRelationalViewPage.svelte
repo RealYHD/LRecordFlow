@@ -2,6 +2,7 @@
   import { route } from '../lib/router.svelte'
   import {
     countIssues,
+    deleteRecord,
     findColumns as findColumnsFromRecords,
     loadRecords as loadRecordsFromStorage,
     setRecord,
@@ -14,7 +15,6 @@
     Checkbox,
     Input,
     Popover,
-    Progressradial,
     Table,
     TableBody,
     TableBodyCell,
@@ -23,7 +23,14 @@
     TableHeadCell
   } from 'flowbite-svelte'
   import EditRecordModal from '../components/EditRecordModal.svelte'
-  import { ExclamationCircleOutline, FloppyDiskAltOutline } from 'flowbite-svelte-icons'
+  import {
+    CheckCircleOutline,
+    ClipboardCheckOutline,
+    EditOutline,
+    ExclamationCircleOutline,
+    FloppyDiskOutline,
+    TrashBinOutline
+  } from 'flowbite-svelte-icons'
   import { onMount } from 'svelte'
 
   const saveDelay = 2
@@ -34,12 +41,16 @@
   const modifiedRecords: [string, number][] = $derived(
     calcModifiedRecords(liveRecordData, savedRecordData)
   )
-  const recordFlushTimers: Record<string, number> = $state({})
+  const recordFlushTimers: Record<string, [number, string]> = $state({})
+  let unsavedRecordsCount: number = $derived(Object.keys(recordFlushTimers).length)
   const rows: Record<string, string>[] = $derived(liveRecordData) // TODO do something with this...
   const cols: [string, string[]][] = $derived(findColumnsFromRecords(liveRecordData))
   const identifiers = $derived(liveRecordData.map((record) => record['Identifier']))
   let liveRecordIssues = $derived(validateRecords(liveRecordData))
-  const liveRecordIssueCount = $derived(countIssues(liveRecordIssues))
+  const liveRecordIssueCount: number[] = $derived(countIssues(liveRecordIssues))
+  let totalIssueCount: number = $derived(
+    liveRecordIssueCount.reduce((total, current) => total + current, 0)
+  )
   let editModalOpen = $state(false)
   let editingLiveIndex: number = $state(0)
   let createRecordIdentifier = $state('')
@@ -48,11 +59,6 @@
   )
   let createPending: boolean = $state(false)
   let createDisabled: boolean = $derived(createRecordIdentifierError.length > 0 || createPending)
-
-  function editRecord(editRecordIndex: number): void {
-    editingLiveIndex = editRecordIndex
-    editModalOpen = true
-  }
 
   function addRecord(): void {
     const identifier = $state.snapshot(createRecordIdentifier)
@@ -66,12 +72,22 @@
       }
     )
   }
+  function editRecord(editRecordIndex: number): void {
+    editingLiveIndex = editRecordIndex
+    editModalOpen = true
+  }
+  function removeRecord(deleteRecordIndex: number): void {
+    const recordIdentifier = liveRecordData[deleteRecordIndex]['Identifier']
+    deleteRecord(localRepoPath, recordIdentifier).then(() => {
+      liveRecordData.splice(deleteRecordIndex)
+      delete savedRecordData[recordIdentifier]
+    })
+  }
 
   function calcModifiedRecords(
     liveRecords: Record<string, string>[],
     flushedRecordsSnapshot: Record<string, Record<string, string>>
   ): [string, number][] {
-    console.log('diffing')
     let changedRecordIdentifiers: [string, number][] = $state([])
     for (const [index, liveRecord] of liveRecords.entries()) {
       if (!Object.hasOwn(flushedRecordsSnapshot, liveRecord['Identifier'])) {
@@ -92,22 +108,25 @@
   }
 
   function flushTick(): void {
-    // In case something was modified and returned, this removes any dangling timers that aren't ticked
     for (const identifier in recordFlushTimers) {
       if (!modifiedRecords.find(([modifiedIdentifier]) => modifiedIdentifier == identifier)) {
         delete recordFlushTimers[identifier]
       }
     }
     for (const [identifier, index] of modifiedRecords) {
-      if (!Object.hasOwn(recordFlushTimers, identifier)) {
-        recordFlushTimers[identifier] = saveDelay
+      let liveRecordSerialized = JSON.stringify(Object.entries(liveRecordData[index]).sort())
+      if (
+        !Object.hasOwn(recordFlushTimers, identifier) ||
+        recordFlushTimers[identifier][1] != liveRecordSerialized
+      ) {
+        recordFlushTimers[identifier] = [saveDelay, liveRecordSerialized]
       }
       if (liveRecordIssueCount[index] > 0) continue
       if (Object.hasOwn(recordFlushTimers, identifier)) {
-        recordFlushTimers[identifier] -=
-          recordFlushTimers[identifier] <= 0 ? 0 : saveTickInterval / 1000
+        recordFlushTimers[identifier][0] -=
+          recordFlushTimers[identifier][0] <= 0 ? 0 : saveTickInterval / 1000
       }
-      if (recordFlushTimers[identifier] <= 0) {
+      if (recordFlushTimers[identifier][0] <= 0) {
         flushRecord(
           $state.snapshot(
             liveRecordData.find((liveRecord) => liveRecord['Identifier'] == identifier)
@@ -154,7 +173,16 @@
   <div>
     <Table hoverable={true} border={true} shadow>
       <TableHead>
-        <TableHeadCell class="w-fit"><FloppyDiskAltOutline class="shrink-0" /></TableHeadCell>
+        <TableHeadCell class="w-fit">
+          {#if totalIssueCount}
+            <ExclamationCircleOutline class="shrink-0" />
+          {:else if unsavedRecordsCount}
+            <FloppyDiskOutline class="shrink-0" />
+          {:else}
+            <ClipboardCheckOutline class="shrink-0" />
+          {/if}
+        </TableHeadCell>
+        <TableHeadCell>Modify</TableHeadCell>
         <TableHeadCell class="w-fit"><Checkbox /></TableHeadCell>
         <TableHeadCell>Identifier</TableHeadCell>
         {#each cols.filter(([colName]) => colName != 'Identifier') as [colName] (colName)}
@@ -166,13 +194,19 @@
           <TableBodyRow class="border-gray-200" ondblclick={() => editRecord(rowIndex)}>
             <TableBodyCell>
               <!-- TODO fix the alignment issue here -->
-              <Progressradial
-                progress={recordFlushTimers[row['Identifier']]
-                  ? 100 * ((saveDelay - recordFlushTimers[row['Identifier']]) / saveDelay)
-                  : 100}
-                class="h-5 w-5"
-                color="gray"
-              />
+              {#if liveRecordIssueCount[rowIndex]}
+                <ExclamationCircleOutline color="red" class="shrink-0" />
+              {:else if recordFlushTimers[rowIndex]}
+                <FloppyDiskOutline color="blue" class="shrink-0" />
+              {:else}
+                <CheckCircleOutline class="shrink-0" />
+              {/if}
+            </TableBodyCell>
+            <TableBodyCell>
+              <ButtonGroup>
+                <Button onclick={() => editRecord(rowIndex)}><EditOutline /></Button>
+                <Button onclick={() => removeRecord(rowIndex)}><TrashBinOutline /></Button>
+              </ButtonGroup>
             </TableBodyCell>
             <TableBodyCell><Checkbox /></TableBodyCell>
             <TableBodyCell>{row['Identifier']}</TableBodyCell>

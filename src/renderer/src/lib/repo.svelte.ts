@@ -72,6 +72,10 @@ export function cloneGitRepository(name: string, remote: string, local: string):
         })
 }
 
+export async function deleteRecord(localRepoPath: string, recordIdentifier: string) {
+    return await window['repo'].deleteRecord(localRepoPath, recordIdentifier)
+}
+
 export async function setRecord(localRepoPath: string, recordIdentifier: string, recordData: Record<string, string>) {
     window['repo'].setRecord(localRepoPath, recordIdentifier, recordData)
 }
@@ -105,7 +109,7 @@ export function validateRecords(records: Record<string, string>[], columnTypes: 
 }
 
 export function countIssues(recordIssues: Record<string, string[]>[]) {
-    const issueCount = $state([])
+    const issueCount: number[] = $state([])
     for (const issueRecord of recordIssues) {
         let total = 0
         for (const key in issueRecord) {

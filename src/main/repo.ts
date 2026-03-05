@@ -97,6 +97,8 @@ export async function getRecordMetadata(localRepoPath: string, recordIdentifier:
 }
 
 export async function setRecord(localRepoPath: string, recordIdentifier: string, recordData: object) {
+    if (!localRepoPath.trim().length) return
+    if (!recordIdentifier.trim().length) return
     await mkdir(path.join(localRepoPath, recordIdentifier), { recursive: true })
     return await fs.writeFile(getRecordMetadataPath(localRepoPath, recordIdentifier), JSON.stringify(recordData))
 }
@@ -131,4 +133,9 @@ export async function repoConfigurationExists(localRepoPath: string) {
 export async function getRepoConfiguration(localRepoPath: string) {
     if (!await repoExists(localRepoPath) || !await repoConfigurationExists(localRepoPath)) return {};
     return JSON.parse(await fs.readFile(path.join(localRepoPath, repoConfigurationFilename), 'utf-8'))
+}
+
+export async function setRepoConfiguration(localRepoPath: string, repoConfiguration: object) {
+    if (!await repoExists(localRepoPath)) return
+    return await fs.writeFile(localRepoPath, JSON.stringify(repoConfiguration))
 }
