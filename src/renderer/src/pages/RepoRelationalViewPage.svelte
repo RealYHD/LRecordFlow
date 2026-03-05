@@ -1,6 +1,7 @@
 <script lang="ts">
   import { route } from '../lib/router.svelte'
   import {
+    countIssues,
     findColumns as findColumnsFromRecords,
     loadRecords as loadRecordsFromStorage,
     setRecord,
@@ -14,7 +15,6 @@
     Input,
     Popover,
     Progressradial,
-    Span,
     Table,
     TableBody,
     TableBodyCell,
@@ -23,27 +23,25 @@
     TableHeadCell
   } from 'flowbite-svelte'
   import EditRecordModal from '../components/EditRecordModal.svelte'
-  import {
-    CheckCircleOutline,
-    ExclamationCircleOutline,
-    FloppyDiskAltOutline
-  } from 'flowbite-svelte-icons'
+  import { ExclamationCircleOutline, FloppyDiskAltOutline } from 'flowbite-svelte-icons'
   import { onMount } from 'svelte'
-  import { SvelteMap } from 'svelte/reactivity'
 
-  const saveDelay = 5
+  const saveDelay = 2
   const saveTickInterval = 100
   const savedRecordData: Record<string, Record<string, string>> = $state({})
   const localRepoPath = route.params.repository
-  const liveRecordData: Record<string, string>[] = $state([])
-  const modifiedRecords: string[] = $derived(calcModifiedRecords(liveRecordData, savedRecordData))
+  let liveRecordData: Record<string, string>[] = $state([])
+  const modifiedRecords: [string, number][] = $derived(
+    calcModifiedRecords(liveRecordData, savedRecordData)
+  )
   const recordFlushTimers: Record<string, number> = $state({})
   const rows: Record<string, string>[] = $derived(liveRecordData) // TODO do something with this...
   const cols: [string, string[]][] = $derived(findColumnsFromRecords(liveRecordData))
   const identifiers = $derived(liveRecordData.map((record) => record['Identifier']))
-  const { issues, issuesCount } = $derived(validateRecords(liveRecordData))
-  let editingRecordData: Record<string, string> = $state({ Identifier: '' })
+  let liveRecordIssues = $derived(validateRecords(liveRecordData))
+  const liveRecordIssueCount = $derived(countIssues(liveRecordIssues))
   let editModalOpen = $state(false)
+  let editingLiveIndex: number = $state(0)
   let createRecordIdentifier = $state('')
   let createRecordIdentifierError = $derived(
     validateRecordIdentifier(createRecordIdentifier, identifiers)
@@ -51,32 +49,34 @@
   let createPending: boolean = $state(false)
   let createDisabled: boolean = $derived(createRecordIdentifierError.length > 0 || createPending)
 
-  function editRecord(record: Record<string, string>): void {
-    editingRecordData = record
+  function editRecord(editRecordIndex: number): void {
+    editingLiveIndex = editRecordIndex
     editModalOpen = true
   }
 
   function addRecord(): void {
     const identifier = $state.snapshot(createRecordIdentifier)
     liveRecordData.push({ Identifier: identifier })
-    editingRecordData = liveRecordData.findLast(
+    editingLiveIndex = liveRecordData.findLastIndex(
       (record) => record['Identifier'] == createRecordIdentifier
     ) // probably O(1)?
-    setRecord(localRepoPath, identifier, editingRecordData).then(() => {
-      editModalOpen = true
-    })
+    setRecord(localRepoPath, identifier, $state.snapshot(liveRecordData[editingLiveIndex])).then(
+      () => {
+        editModalOpen = true
+      }
+    )
   }
 
   function calcModifiedRecords(
     liveRecords: Record<string, string>[],
     flushedRecordsSnapshot: Record<string, Record<string, string>>
-  ): string[] {
+  ): [string, number][] {
     console.log('diffing')
-    let changedRecordIdentifiers: string[] = $state([])
-    for (const liveRecord of liveRecords) {
+    let changedRecordIdentifiers: [string, number][] = $state([])
+    for (const [index, liveRecord] of liveRecords.entries()) {
       if (!Object.hasOwn(flushedRecordsSnapshot, liveRecord['Identifier'])) {
         // Accounts for new records
-        changedRecordIdentifiers.push(liveRecord['Identifier'])
+        changedRecordIdentifiers.push([liveRecord['Identifier'], index])
         continue
       }
       if (
@@ -84,7 +84,7 @@
           Object.entries(flushedRecordsSnapshot[liveRecord['Identifier']]).toSorted()
         ) != JSON.stringify(Object.entries($state.snapshot(liveRecord)).toSorted())
       ) {
-        changedRecordIdentifiers.push(liveRecord['Identifier'])
+        changedRecordIdentifiers.push([liveRecord['Identifier'], index])
         continue
       }
     }
@@ -94,12 +94,16 @@
   function flushTick(): void {
     // In case something was modified and returned, this removes any dangling timers that aren't ticked
     for (const identifier in recordFlushTimers) {
-      if (!modifiedRecords.includes(identifier)) delete recordFlushTimers[identifier]
+      if (!modifiedRecords.find(([modifiedIdentifier]) => modifiedIdentifier == identifier)) {
+        delete recordFlushTimers[identifier]
+      }
     }
-    for (const identifier of modifiedRecords) {
+    for (const [identifier, index] of modifiedRecords) {
       if (!Object.hasOwn(recordFlushTimers, identifier)) {
         recordFlushTimers[identifier] = saveDelay
-      } else {
+      }
+      if (liveRecordIssueCount[index] > 0) continue
+      if (Object.hasOwn(recordFlushTimers, identifier)) {
         recordFlushTimers[identifier] -=
           recordFlushTimers[identifier] <= 0 ? 0 : saveTickInterval / 1000
       }
@@ -135,8 +139,9 @@
 
 <EditRecordModal
   bind:modalOpen={editModalOpen}
-  {localRepoPath}
-  bind:recordData={editingRecordData}
+  bind:liveRecords={liveRecordData}
+  bind:liveIssues={liveRecordIssues}
+  bind:editRecordIndex={editingLiveIndex}
 />
 
 <div class="w-full h-full px-4 sm:px-1">
@@ -149,15 +154,16 @@
   <div>
     <Table hoverable={true} border={true} shadow>
       <TableHead>
-        <TableHeadCell><FloppyDiskAltOutline class="shrink-0" /></TableHeadCell>
+        <TableHeadCell class="w-fit"><FloppyDiskAltOutline class="shrink-0" /></TableHeadCell>
         <TableHeadCell class="w-fit"><Checkbox /></TableHeadCell>
-        {#each cols as [colName] (colName)}
+        <TableHeadCell>Identifier</TableHeadCell>
+        {#each cols.filter(([colName]) => colName != 'Identifier') as [colName] (colName)}
           <TableHeadCell>{colName}</TableHeadCell>
         {/each}
       </TableHead>
       <TableBody>
         {#each rows as row, rowIndex (row['Identifier'])}
-          <TableBodyRow class="border-gray-200" ondblclick={() => editRecord(row)}>
+          <TableBodyRow class="border-gray-200" ondblclick={() => editRecord(rowIndex)}>
             <TableBodyCell>
               <!-- TODO fix the alignment issue here -->
               <Progressradial
@@ -169,11 +175,11 @@
               />
             </TableBodyCell>
             <TableBodyCell><Checkbox /></TableBodyCell>
-            {#each cols as [colName], colIndex (colName)}
+            <TableBodyCell>{row['Identifier']}</TableBodyCell>
+            {#each cols.filter(([colName]) => colName != 'Identifier') as [colName], colIndex (colName)}
               <TableBodyCell>
                 <div class="flex">
-                  {#if colName == 'Identifier'}{/if}
-                  {#if issues[rowIndex][colName] && issues[rowIndex][colName].length}
+                  {#if liveRecordIssues[rowIndex][colName] && liveRecordIssues[rowIndex][colName].length}
                     <ExclamationCircleOutline
                       color="red"
                       class="shrink-0"
@@ -181,7 +187,7 @@
                     />
                     <Popover triggeredBy={`#table-issue-${rowIndex}-${colIndex}`}>
                       <ul>
-                        {#each issues[rowIndex][colName] as issue (issue)}
+                        {#each liveRecordIssues[rowIndex][colName] as issue (issue)}
                           <li>{issue}</li>
                         {/each}
                       </ul>

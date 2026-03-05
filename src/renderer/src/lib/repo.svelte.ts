@@ -77,30 +77,44 @@ export async function setRecord(localRepoPath: string, recordIdentifier: string,
 }
 
 export function validateRecords(records: Record<string, string>[], columnTypes: Record<string, string[]> = null) {
-    let issuesCount = 0
-    let recordValidationResults: Record<string, string[]>[] = []
+    let issues: Record<string, string[]>[] = $state([])
     for (const record of records) {
-        let recordValidationResult: Record<string, string[]> = {}
-        recordValidationResults.push(recordValidationResult)
+        issues.push({})
+        let recordIssues = issues[issues.length - 1]
+        for (const metadataKey in record) {
+            recordIssues[metadataKey] = []
+            const metadataKeyIssues = recordIssues[metadataKey]
+            if (metadataKey.trim() == '') metadataKeyIssues.push("Metadata key cannot be empty.")
+        }
         if (columnTypes != null) {
-            for (const columnName in columnTypes) {
-                if (!Object.hasOwn(columnTypes, columnName)) continue;
-
-                const acceptableValues = columnTypes[columnName];
-                recordValidationResult[columnName] = []
-                if (record[columnName]) {
-                    if (!acceptableValues.includes(record[columnName])) {
-                        recordValidationResult[columnName].push(`"${record[columnName]}" is not an acceptable value for column "${columnName}".`)
-                        issuesCount += 1
+            for (const metadataKey in columnTypes) {
+                const acceptableValues = columnTypes[metadataKey];
+                if (!recordIssues[metadataKey]) recordIssues[metadataKey] = []
+                const columnIssues = recordIssues[metadataKey]
+                if (record[metadataKey]) {
+                    if (!acceptableValues.includes(record[metadataKey])) {
+                        columnIssues.push(`"${record[metadataKey]}" is not an acceptable value for column "${metadataKey}".`)
                     }
                 } else {
-                    recordValidationResult[columnName].push(`Missing value for column "${columnName}".`)
-                    issuesCount += 1
+                    columnIssues.push(`Missing value for column "${metadataKey}".`)
                 }
             }
         }
     }
-    return { issues: recordValidationResults, issuesCount }
+    return issues
+}
+
+export function countIssues(recordIssues: Record<string, string[]>[]) {
+    const issueCount = $state([])
+    for (const issueRecord of recordIssues) {
+        let total = 0
+        for (const key in issueRecord) {
+            const issues = issueRecord[key];
+            total += issues.length
+        }
+        issueCount.push(total)
+    }
+    return issueCount
 }
 
 export function validateRecordIdentifier(identifier: string, allIdentifiers: string[]) {
