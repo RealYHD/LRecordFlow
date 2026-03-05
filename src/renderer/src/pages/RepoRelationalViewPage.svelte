@@ -28,16 +28,15 @@
   import { SvelteMap } from 'svelte/reactivity'
 
   const saveDelay = 10
-  const savedRecords: Record<string, Record<string, string>> = $state({})
+  const savedRecordData: Record<string, Record<string, string>> = $state({})
   const localRepoPath = route.params.repository
-  const liveRecords: Record<string, string>[] = $state([])
-  const recordSaveTimers: Record<string, number> = $derived(
-    setSaveTimers(liveRecords, savedRecords)
-  )
-  const rows: Record<string, string>[] = $derived(liveRecords) // TODO do something with this...
-  const cols: [string, string[]][] = $derived(findColumnsFromRecords(liveRecords))
-  const identifiers = $derived(liveRecords.map((record) => record['Identifier']))
-  const { issues, issuesCount } = $derived(validateRecords(liveRecords))
+  const liveRecordData: Record<string, string>[] = $state([])
+  const modifiedRecords: string[] = $derived(calcModifiedRecords(liveRecordData, savedRecordData))
+  const recordFlushTimers: Map<string, number> = new SvelteMap()
+  const rows: Record<string, string>[] = $derived(liveRecordData) // TODO do something with this...
+  const cols: [string, string[]][] = $derived(findColumnsFromRecords(liveRecordData))
+  const identifiers = $derived(liveRecordData.map((record) => record['Identifier']))
+  const { issues, issuesCount } = $derived(validateRecords(liveRecordData))
   let editingRecordData: Record<string, string> = $state({ Identifier: '' })
   let editModalOpen = $state(false)
   let createRecordIdentifier = $state('')
@@ -54,8 +53,8 @@
 
   function addRecord(): void {
     const identifier = $state.snapshot(createRecordIdentifier)
-    liveRecords.push({ Identifier: identifier })
-    editingRecordData = liveRecords.findLast(
+    liveRecordData.push({ Identifier: identifier })
+    editingRecordData = liveRecordData.findLast(
       (record) => record['Identifier'] == createRecordIdentifier
     ) // probably O(1)?
     setRecord(localRepoPath, identifier, editingRecordData).then(() => {
@@ -63,16 +62,16 @@
     })
   }
 
-  function setSaveTimers(
+  function calcModifiedRecords(
     liveRecords: Record<string, string>[],
     flushedRecordsSnapshot: Record<string, Record<string, string>>
-  ): Record<string, number> {
+  ): string[] {
     console.log('diffing')
-    let changedRecordIdentifiers: Record<string, number> = $state({})
+    let changedRecordIdentifiers: string[] = $state([])
     for (const liveRecord of liveRecords) {
       if (!Object.hasOwn(flushedRecordsSnapshot, liveRecord['Identifier'])) {
         // Accounts for new records
-        changedRecordIdentifiers[liveRecord['Identifier']] = saveDelay
+        changedRecordIdentifiers.push(liveRecord['Identifier'])
         continue
       }
       if (
@@ -80,47 +79,64 @@
           Object.entries(flushedRecordsSnapshot[liveRecord['Identifier']]).toSorted()
         ) != JSON.stringify(Object.entries($state.snapshot(liveRecord)).toSorted())
       ) {
-        changedRecordIdentifiers[liveRecord['Identifier']] = saveDelay
+        changedRecordIdentifiers.push(liveRecord['Identifier'])
         continue
       }
     }
     return changedRecordIdentifiers
   }
 
-  function saveTick(): void {
-    for (const identifier in recordSaveTimers) {
-      if (!Object.hasOwn(recordSaveTimers, identifier)) continue
-      recordSaveTimers[identifier] -= recordSaveTimers[identifier] == 0 ? 0 : 1
-      if (recordSaveTimers[identifier] == 0) {
+  function flushTick(): void {
+    // In case something was modified and returned, this removes any dangling timers that aren't ticked
+    for (const identifier in recordFlushTimers) {
+      if (!modifiedRecords.includes(identifier)) recordFlushTimers.delete(identifier)
+    }
+    for (const identifier of modifiedRecords) {
+      console.log($state.snapshot(modifiedRecords))
+      console.log($state.snapshot(recordFlushTimers))
+      if (!recordFlushTimers.has(identifier)) {
+        console.log('setting timer')
+        recordFlushTimers[identifier] = saveDelay
+      } else {
+        recordFlushTimers[identifier] -= recordFlushTimers[identifier] < 0 ? 0 : 1
+      }
+      console.log(`Ticking ${identifier}: ${recordFlushTimers[identifier]}`)
+      if (recordFlushTimers[identifier] == 0) {
         flushRecord(
-          $state.snapshot(liveRecords.find((liveRecord) => liveRecord['Identifier'] == identifier))
+          $state.snapshot(
+            liveRecordData.find((liveRecord) => liveRecord['Identifier'] == identifier)
+          )
         )
+      }
+      if (recordFlushTimers[identifier] < 0) {
+        console.log('delete')
+        recordFlushTimers.delete(identifier)
       }
     }
   }
 
   function flushRecord(modifiedRecord: Record<string, string>): void {
     setRecord(localRepoPath, modifiedRecord['Identifier'], modifiedRecord)
-    savedRecords[modifiedRecord['Identifier']] = modifiedRecord
+    savedRecordData[modifiedRecord['Identifier']] = modifiedRecord
     console.log(`Flushed ${modifiedRecord['Identifier']}`)
-    console.log($state.snapshot(savedRecords))
+    console.log($state.snapshot(savedRecordData))
   }
 
   function loadRecords(): void {
-    liveRecords.length = 0
+    liveRecordData.length = 0
     loadRecordsFromStorage(localRepoPath).then((loadedRecords) => {
-      liveRecords.push(...loadedRecords)
+      liveRecordData.push(...loadedRecords)
       for (const loadedRecord of loadedRecords) {
-        savedRecords[loadedRecord['Identifier']] = loadedRecord
+        savedRecordData[loadedRecord['Identifier']] = loadedRecord
       }
       console.log('load')
-      console.log($state.snapshot(savedRecords))
-      console.log($state.snapshot(liveRecords))
+      console.log($state.snapshot(savedRecordData))
+      console.log($state.snapshot(liveRecordData))
     })
   }
   onMount(() => {
     loadRecords()
-    setInterval(saveTick, 1000)
+    setInterval(flushTick, 1000)
   })
 </script>
 
@@ -153,9 +169,11 @@
               <TableBodyCell>
                 <div class="flex">
                   {#if colName == 'Identifier'}
-                    {#if Object.hasOwn(recordSaveTimers, row['Identifier'])}
+                    {#if Object.hasOwn(recordFlushTimers, row['Identifier'])}
                       <Span>
-                        {recordSaveTimers[row['Identifiers']]}
+                        <Progressradial
+                          progress={100 * (recordFlushTimers[row['Identifier']] / saveDelay)}
+                        />
                       </Span>
                     {/if}
                   {/if}
