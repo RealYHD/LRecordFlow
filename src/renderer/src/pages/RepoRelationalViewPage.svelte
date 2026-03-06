@@ -70,7 +70,6 @@
   let editingLiveIndex: number = $state(0)
 
   let editRepoConfigOpen = $state(false)
-  let editRepoConfigForm: ConfigureRepository
 
   let createRecordIdentifier = $state('')
   let createRecordIdentifierError = $derived(
@@ -96,8 +95,6 @@
     editingLiveIndex = editRecordIndex
     editRecordDataOpen = true
   }
-
-  function initiateRepoConfigEdit(): void {}
 
   function removeRecord(deleteRecordIndex: number): void {
     const recordIdentifier = liveRecordData[deleteRecordIndex]['Identifier']
@@ -228,7 +225,6 @@
         <Button
           onclick={() => {
             editRepoConfigOpen = true
-            initiateRepoConfigEdit()
           }}
         >
           <AdjustmentsVerticalOutline />
