@@ -5,8 +5,16 @@ export enum MetadataValueType {
     Options = "options", Date = "date", Number = "number", Text = "text"
 }
 
+export interface MetadataValueDescriptor {
+    valueType: MetadataValueType
+    options: string[]
+}
+export interface MetadataKeyValuePairDescriptor {
+    key: string,
+    value: MetadataValueDescriptor
+}
 export interface RepositoryConfiguration {
-    requiredMetadata: Record<string, [MetadataValueType, string[]]>
+    requiredMetadata: MetadataKeyValuePairDescriptor[]
     exactKeys: boolean
 }
 
@@ -24,8 +32,8 @@ export async function loadRecords(localRepoPath: string): Promise<RepositoryReco
     return records
 }
 
-export function getColumnsFromRecords(records: RepositoryRecordData[]): [string, string[]][] {
-    let columns: Record<string, string[]> = {}
+export function getColumnsFromRecords(records: RepositoryRecordData[]): MetadataKeyValuePairDescriptor[] {
+    let columns: Record<string, string[]> = $state({})
     columns['Identifier'] = []
     for (const record of records) {
         for (const key in record) {
@@ -38,7 +46,31 @@ export function getColumnsFromRecords(records: RepositoryRecordData[]): [string,
             columns[key].push(element)
         }
     }
-    return Object.entries(columns).map(([colName, colValues]) => [colName, colValues])
+    return Object.entries(columns).map(([colName, colValues]) => ({ key: colName, value: { valueType: MetadataValueType.Text, options: colValues } }))
+}
+// TODO unify naming scheme for columns and metadata (will switch to referring to columns solely as metadata)
+export function updateColumnsByRepoConfig(repoConfig: RepositoryConfiguration, columns: MetadataKeyValuePairDescriptor[]): void {
+    let repoConfigSnapshot = $state.snapshot(repoConfig)
+    for (let index = 0; index < repoConfigSnapshot.requiredMetadata.length; index++) {
+        const configKeyValueDesc = repoConfigSnapshot.requiredMetadata[index];
+        let { key: requiredKey, value: requiredValue } = configKeyValueDesc
+        let currentKeyValDesc = columns.find((keyValuePairDesc) => keyValuePairDesc.key == requiredKey)
+        if (currentKeyValDesc) {
+            if (requiredValue.valueType == MetadataValueType.Options) {
+                currentKeyValDesc.value.options.length = 0
+            }
+            currentKeyValDesc.value.valueType = requiredValue.valueType
+            currentKeyValDesc.value.options.push(...requiredValue.options)
+        } else {
+            columns.push(configKeyValueDesc)
+        }
+    }
+}
+
+export function aggregateRepositoryMetadata(records: RepositoryRecordData[], repoConfig: RepositoryConfiguration) {
+    let recordColumns = getColumnsFromRecords(records)
+    updateColumnsByRepoConfig(repoConfig, recordColumns)
+    return recordColumns
 }
 
 
@@ -98,7 +130,7 @@ export async function setRepoConfig(localRepoPath: string, repoConfiguration: Re
     return window['repo'].setRepoConfiguration(localRepoPath, repoConfiguration)
 }
 
-export function validateRecords(records: RepositoryRecordData[], columnTypes: Record<string, string[]> = null) {
+export function validateRecords(records: RepositoryRecordData[], repoConfig: RepositoryConfiguration = null) {
     let issues: Record<string, string[]>[] = $state([])
     for (const record of records) {
         issues.push({})
@@ -108,17 +140,27 @@ export function validateRecords(records: RepositoryRecordData[], columnTypes: Re
             const metadataKeyIssues = recordIssues[metadataKey]
             if (metadataKey.trim() == '') metadataKeyIssues.push("Metadata key cannot be empty.")
         }
-        if (columnTypes != null) {
-            for (const metadataKey in columnTypes) {
-                const acceptableValues = columnTypes[metadataKey];
-                if (!recordIssues[metadataKey]) recordIssues[metadataKey] = []
-                const columnIssues = recordIssues[metadataKey]
-                if (record[metadataKey]) {
-                    if (!acceptableValues.includes(record[metadataKey])) {
-                        columnIssues.push(`"${record[metadataKey]}" is not an acceptable value for column "${metadataKey}".`)
+        if (repoConfig != null) {
+            for (const { key, value: valueDesc } of repoConfig.requiredMetadata) {
+                if (!recordIssues[key]) recordIssues[key] = []
+                const requiredKeyIssues = recordIssues[key]
+                if (record[key]) {
+                    switch (valueDesc.valueType) {
+                        case MetadataValueType.Date:
+                            if (!Date.parse(record[key])) requiredKeyIssues.push(`"${record[key]}" is expected to be in a date format but could not be parsed as a date.`)
+                            break;
+                        case MetadataValueType.Number:
+                            if (!Number.parseFloat(record[key])) requiredKeyIssues.push(`"${record[key]}" is expected to be a number but could not be parsed as a number.`)
+                            break;
+                        case MetadataValueType.Options:
+                            if (!valueDesc.options.includes(record[key])) requiredKeyIssues.push(`"${record[key]}" is not one of ${valueDesc.options.join(', ')}.`)
+                            break;
+                        case MetadataValueType.Text:
+                            // Nothing to do here, assume everything is text.
+                            break;
                     }
                 } else {
-                    columnIssues.push(`Missing value for column "${metadataKey}".`)
+                    requiredKeyIssues.push(`Missing value for required "${key}".`)
                 }
             }
         }
@@ -154,12 +196,10 @@ export function validateRecordIdentifier(identifier: string, allIdentifiers: str
 
 export function validateRepoConfig(repoConfig: RepositoryConfiguration): Record<string, string[]> {
     let issues: Record<string, string[]> = $state({})
-    for (const metadataKey in repoConfig.requiredMetadata) {
-        issues[metadataKey] = []
-        const metadataIssues = issues[metadataKey]
-        const [metadataType, options] = repoConfig.requiredMetadata[metadataKey];
-
-        if (metadataKey.trim().length == 0) {
+    for (const { key, value } of repoConfig.requiredMetadata) {
+        issues[key] = []
+        const metadataIssues = issues[key];
+        if (key.trim().length == 0) {
             metadataIssues.push("Metadata key cannot be empty.")
         }
     }
@@ -171,7 +211,7 @@ export function validateMetadataKey(key: string, repoConfig: RepositoryConfigura
     if (key.trim().length == 0) {
         issues.push("Key cannot be empty.")
     }
-    if (repoConfig.requiredMetadata[key]) {
+    if (repoConfig.requiredMetadata.find((value) => value.key == key)) {
         issues.push(`"${key}" already exists.`)
     }
     return issues

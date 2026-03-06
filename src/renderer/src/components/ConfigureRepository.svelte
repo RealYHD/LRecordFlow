@@ -17,16 +17,10 @@
   import { PlusOutline, TrashBinOutline } from 'flowbite-svelte-icons'
 
   const {
-    repoConfig,
-    completionCallbackFn
+    repoConfig = $bindable()
   }: {
     repoConfig: RepositoryConfiguration
-    completionCallbackFn: (updatedConfig: RepositoryConfiguration) => void
   } = $props()
-
-  // TODO maybe there's a better way of doing this
-  // svelte-ignore state_referenced_locally
-  let modifiedRepoConfig = $state(repoConfig)
 
   let metadataKeyToAdd: string = $state('')
   let metadataKeyIssues: string[] = $derived(validateMetadataKey(metadataKeyToAdd, repoConfig))
@@ -52,19 +46,22 @@
             <Input bind:value={metadataKeyToAdd} placeholder="key" />
             <Button
               onclick={() =>
-                (modifiedRepoConfig.requiredMetadata[metadataKeyToAdd] = [
-                  MetadataValueType.Text,
-                  []
-                ])}
+                repoConfig.requiredMetadata.push({
+                  key: metadataKeyToAdd,
+                  value: {
+                    valueType: MetadataValueType.Text,
+                    options: []
+                  }
+                })}
               disabled={Boolean(metadataKeyIssues.length)}><PlusOutline /></Button
             >
           </ButtonGroup>
         </div>
-        {#if Object.keys(modifiedRepoConfig.requiredMetadata).length}
+        {#if repoConfig.requiredMetadata.length}
           <Accordion flush>
-            {#each Object.entries(modifiedRepoConfig.requiredMetadata) as [key], index (index)}
+            {#each repoConfig.requiredMetadata as metadataKeyValueDescriptor, index (index)}
               <AccordionItem>
-                {#snippet header()}Configure "{key}"{/snippet}
+                {#snippet header()}Configure "{metadataKeyValueDescriptor.key}"{/snippet}
                 <Label class="mb-2">Set value type</Label>
                 <Select
                   class="mt-2"
@@ -72,35 +69,32 @@
                     value,
                     name
                   }))}
-                  bind:value={modifiedRepoConfig.requiredMetadata[key][0]}
+                  bind:value={repoConfig.requiredMetadata[index].value.valueType}
                 />
-                {#if modifiedRepoConfig.requiredMetadata[key][0] == MetadataValueType.Options}
+                {#if repoConfig.requiredMetadata[index].value.valueType == MetadataValueType.Options}
                   <div class="mt-2 space-y-2">
                     <Label class="mb-2">Add option</Label>
                     <ButtonGroup>
                       <Input id="" bind:value={metadataKeyOptionToAdd} />
                       <Button
-                        onclick={() => {
-                          console.log($state.snapshot(modifiedRepoConfig.requiredMetadata[key]))
-                          modifiedRepoConfig.requiredMetadata[key][1].push(metadataKeyOptionToAdd)
-                        }}><PlusOutline /></Button
+                        onclick={() =>
+                          repoConfig.requiredMetadata[index].value.options.push(
+                            metadataKeyOptionToAdd
+                          )}
+                        disabled={repoConfig.requiredMetadata[index].value.options.includes(
+                          metadataKeyOptionToAdd
+                        )}><PlusOutline /></Button
                       >
                     </ButtonGroup>
-                    {#each modifiedRepoConfig.requiredMetadata[key][1] as options, optionIndex (optionIndex)}
+                    {#each { length: repoConfig.requiredMetadata[index].value.options.length }, optionIndex}
                       <ButtonGroup>
                         <Input
-                          bind:value={modifiedRepoConfig.requiredMetadata[key][1][optionIndex]}
+                          bind:value={repoConfig.requiredMetadata[index].value.options[optionIndex]}
                         />
                         <Button
-                          onclick={() => {
-                            if (
-                              !options.includes(
-                                modifiedRepoConfig.requiredMetadata[key][1][optionIndex]
-                              )
-                            ) {
-                              modifiedRepoConfig.requiredMetadata[1].splice(optionIndex, 1)
-                            }
-                          }}><TrashBinOutline /></Button
+                          onclick={() =>
+                            repoConfig.requiredMetadata[index].value.options.splice(optionIndex, 1)}
+                          ><TrashBinOutline /></Button
                         >
                       </ButtonGroup>
                     {/each}
@@ -115,15 +109,6 @@
       <div>
         <!-- TODO implement adding configuring the columns -->
       </div>
-    </div>
-    <div>
-      <Button
-        onclick={() => {
-          completionCallbackFn($state.snapshot(modifiedRepoConfig))
-        }}
-        class="w-fit mx-auto">Save</Button
-      >
-      <Button class="w-fit mx-auto" outline>Cancel</Button>
     </div>
   </div>
 </div>

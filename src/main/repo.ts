@@ -137,5 +137,5 @@ export async function getRepoConfiguration(localRepoPath: string) {
 
 export async function setRepoConfiguration(localRepoPath: string, repoConfiguration: object) {
     if (!await repoExists(localRepoPath)) return
-    return await fs.writeFile(localRepoPath, JSON.stringify(repoConfiguration))
+    return await fs.writeFile(path.join(localRepoPath, repoConfigurationFilename), JSON.stringify(repoConfiguration))
 }

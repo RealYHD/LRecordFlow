@@ -1,15 +1,16 @@
 <script lang="ts">
   import { route } from '../lib/router.svelte'
   import {
+    aggregateRepositoryMetadata,
     countIssues,
     deleteRecord,
-    getColumnsFromRecords as findColumnsFromRecords,
     getRepoConfig,
     loadRecords as loadRecordsFromStorage,
     saveRecord,
     setRepoConfig,
     validateRecordIdentifier,
     validateRecords,
+    type MetadataKeyValuePairDescriptor,
     type RepositoryConfiguration,
     type RepositoryRecordData
   } from '../lib/repo.svelte'
@@ -44,7 +45,7 @@
 
   let liveRecordData: RepositoryRecordData[] = $state([])
   let liveRepoConfiguration: RepositoryConfiguration = $state({
-    requiredMetadata: {},
+    requiredMetadata: [],
     exactKeys: false
   })
 
@@ -58,10 +59,13 @@
   let unsavedRecordsCount: number = $derived(Object.keys(recordFlushState).length)
 
   const displayedRows: RepositoryRecordData[] = $derived(liveRecordData) // TODO do something with this...
-  const displayedCols: [string, string[]][] = $derived(findColumnsFromRecords(liveRecordData))
+  const displayedCols: MetadataKeyValuePairDescriptor[] = $derived(
+    aggregateRepositoryMetadata(liveRecordData, liveRepoConfiguration)
+  )
+  $inspect(displayedCols).with(console.log)
   const identifiers = $derived(liveRecordData.map((record) => record['Identifier']))
 
-  let liveRecordIssues = $derived(validateRecords(liveRecordData))
+  let liveRecordIssues = $derived(validateRecords(liveRecordData, liveRepoConfiguration))
   const liveRecordIssueCount: number[] = $derived(countIssues(liveRecordIssues))
   let totalIssueCount: number = $derived(
     liveRecordIssueCount.reduce((total, current) => total + current, 0)
@@ -175,12 +179,8 @@
     })
   }
 
-  function flushRepoConfiguration(): void {
-    setRepoConfig(localRepoPath, liveRepoConfiguration)
-  }
-
   function loadRepoConfiguration(): void {
-    liveRepoConfiguration.requiredMetadata = {}
+    liveRepoConfiguration.requiredMetadata = []
     liveRepoConfiguration.exactKeys = false
     getRepoConfig(localRepoPath).then((loadedConfig) => {
       Object.assign(liveRepoConfiguration, loadedConfig)
@@ -193,15 +193,14 @@
   })
 </script>
 
-<Drawer bind:open={editRepoConfigOpen} placement="right">
-  <ConfigureRepository
-    repoConfig={$state.snapshot(liveRepoConfiguration)}
-    completionCallbackFn={(updatedRepoConfig) => {
-      Object.assign(liveRepoConfiguration, updatedRepoConfig)
-      editRepoConfigOpen = false
-      flushRepoConfiguration()
-    }}
-  />
+<Drawer
+  bind:open={editRepoConfigOpen}
+  placement="right"
+  onclose={() => {
+    setRepoConfig(localRepoPath, $state.snapshot(liveRepoConfiguration))
+  }}
+>
+  <ConfigureRepository bind:repoConfig={liveRepoConfiguration} />
 </Drawer>
 
 <Drawer bind:open={editRecordDataOpen} placement="right">
@@ -248,8 +247,8 @@
         <TableHeadCell>Modify</TableHeadCell>
         <TableHeadCell class="w-fit"><Checkbox /></TableHeadCell>
         <TableHeadCell>Identifier</TableHeadCell>
-        {#each displayedCols.filter(([colName]) => colName != 'Identifier') as [colName] (colName)}
-          <TableHeadCell>{colName}</TableHeadCell>
+        {#each displayedCols.filter(({ key }) => key != 'Identifier') as { key } (key)}
+          <TableHeadCell>{key}</TableHeadCell>
         {/each}
       </TableHead>
       <TableBody>
@@ -273,10 +272,10 @@
             </TableBodyCell>
             <TableBodyCell><Checkbox /></TableBodyCell>
             <TableBodyCell>{row['Identifier']}</TableBodyCell>
-            {#each displayedCols.filter(([colName]) => colName != 'Identifier') as [colName], colIndex (colName)}
+            {#each displayedCols.filter(({ key }) => key != 'Identifier') as { key }, colIndex (colIndex)}
               <TableBodyCell>
                 <div class="flex">
-                  {#if liveRecordIssues[rowIndex][colName] && liveRecordIssues[rowIndex][colName].length}
+                  {#if liveRecordIssues[rowIndex][key] && liveRecordIssues[rowIndex][key].length}
                     <ExclamationCircleOutline
                       color="red"
                       class="shrink-0"
@@ -284,13 +283,13 @@
                     />
                     <Popover triggeredBy={`#table-issue-${rowIndex}-${colIndex}`}>
                       <ul>
-                        {#each liveRecordIssues[rowIndex][colName] as issue (issue)}
+                        {#each liveRecordIssues[rowIndex][key] as issue (issue)}
                           <li>{issue}</li>
                         {/each}
                       </ul>
                     </Popover>
                   {/if}
-                  {row[colName]}
+                  {row[key]}
                 </div>
               </TableBodyCell>
             {/each}
