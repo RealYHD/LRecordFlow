@@ -1,15 +1,7 @@
 <script lang="ts">
-  import {
-    Navbar,
-    NavBrand,
-    NavLi,
-    NavUl,
-    NavHamburger,
-    ButtonGroup,
-    Button
-  } from 'flowbite-svelte'
+  import { Navbar, NavBrand, NavLi, NavUl, NavHamburger } from 'flowbite-svelte'
   import { Router } from 'sv-router'
-  import { navigate, p, route } from './lib/router.svelte'
+  import { p } from './lib/router.svelte'
   import { flush, load } from './lib/state.svelte'
   import { onMount } from 'svelte'
 
@@ -27,28 +19,8 @@
     >
   </NavBrand>
 
-  {#if route.params.repository}
-    <ButtonGroup>
-      <Button
-        onclick={() =>
-          navigate('/:repository/relational', { params: { repository: route.params.repository } })}
-        >View</Button
-      >
-      <Button
-        onclick={() =>
-          navigate('/:repository/save', { params: { repository: route.params.repository } })}
-        >Save</Button
-      >
-      <Button
-        onclick={() =>
-          navigate('/:repository/configure', { params: { repository: route.params.repository } })}
-        >Configuration</Button
-      >
-    </ButtonGroup>
-  {/if}
-
-  <NavHamburger class="order-2" />
-  <NavUl class="order-2">
+  <NavHamburger />
+  <NavUl>
     <NavLi href={p('/')}>Repositories</NavLi>
     <NavLi href={p('/notifications')}>Notifications</NavLi>
     <NavLi href={p('/help')}>Help</NavLi>
