@@ -2,7 +2,7 @@ import { createRouter } from 'sv-router';
 import SelectRepoPage from '../pages/SelectRepoPage.svelte';
 import RepoRelationalOverviewPage from '../pages/RepoRelationalViewPage.svelte';
 import RepoItemOverviewPage from '../pages/RepoItemViewPage.svelte';
-import ConfigureRepoPage from '../pages/ConfigureRepoPage.svelte';
+import ConfigureRepoPage from '../components/ConfigureRepository.svelte';
 import SavePage from '../pages/SavePage.svelte';
 import OngoingTasksPage from '../pages/TasksOverviewPage.svelte';
 import HelpPage from '../pages/HelpPage.svelte';

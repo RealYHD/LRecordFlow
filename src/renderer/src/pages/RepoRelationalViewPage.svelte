@@ -3,17 +3,21 @@
   import {
     countIssues,
     deleteRecord,
-    findColumns as findColumnsFromRecords,
+    getColumnsFromRecords as findColumnsFromRecords,
+    getRepoConfig,
     loadRecords as loadRecordsFromStorage,
-    setRecord,
+    saveRecord,
+    setRepoConfig,
     validateRecordIdentifier,
     validateRecords,
+    type RepositoryConfiguration,
     type RepositoryRecordData
   } from '../lib/repo.svelte'
   import {
     Button,
     ButtonGroup,
     Checkbox,
+    Drawer,
     Input,
     Popover,
     Table,
@@ -23,8 +27,9 @@
     TableHead,
     TableHeadCell
   } from 'flowbite-svelte'
-  import EditRecordModal from '../components/EditRecordModal.svelte'
+  import EditRecordData from '../components/EditRecordData.svelte'
   import {
+    AdjustmentsVerticalOutline,
     CheckCircleOutline,
     ClipboardCheckOutline,
     EditOutline,
@@ -33,27 +38,40 @@
     TrashBinOutline
   } from 'flowbite-svelte-icons'
   import { onMount } from 'svelte'
+  import ConfigureRepository from '../components/ConfigureRepository.svelte'
+
+  const localRepoPath = route.params.repository
+
+  let liveRecordData: RepositoryRecordData[] = $state([])
+  let liveRepoConfiguration: RepositoryConfiguration = $state({
+    requiredMetadata: [],
+    exactKeys: false
+  })
 
   const saveDelay = 2
   const saveTickInterval = 100
-  const savedRecordData: Record<string, RepositoryRecordData> = $state({})
-  const localRepoPath = route.params.repository
-  let liveRecordData: RepositoryRecordData[] = $state([])
+  const persistedRecordData: Record<string, RepositoryRecordData> = $state({})
   const modifiedRecords: [string, number][] = $derived(
-    calcModifiedRecords(liveRecordData, savedRecordData)
+    calcModifiedRecords(liveRecordData, persistedRecordData)
   )
-  const recordFlushTimers: Record<string, [number, string]> = $state({})
-  let unsavedRecordsCount: number = $derived(Object.keys(recordFlushTimers).length)
-  const rows: RepositoryRecordData[] = $derived(liveRecordData) // TODO do something with this...
-  const cols: [string, string[]][] = $derived(findColumnsFromRecords(liveRecordData))
+  const recordFlushState: Record<string, [number, string, boolean]> = $state({})
+  let unsavedRecordsCount: number = $derived(Object.keys(recordFlushState).length)
+
+  const displayedRows: RepositoryRecordData[] = $derived(liveRecordData) // TODO do something with this...
+  const displayedCols: [string, string[]][] = $derived(findColumnsFromRecords(liveRecordData))
   const identifiers = $derived(liveRecordData.map((record) => record['Identifier']))
+
   let liveRecordIssues = $derived(validateRecords(liveRecordData))
   const liveRecordIssueCount: number[] = $derived(countIssues(liveRecordIssues))
   let totalIssueCount: number = $derived(
     liveRecordIssueCount.reduce((total, current) => total + current, 0)
   )
-  let editModalOpen = $state(false)
+  let editRecordDataOpen = $state(false)
   let editingLiveIndex: number = $state(0)
+
+  let editRepoConfigOpen = $state(false)
+  let editRepoConfigForm: ConfigureRepository
+
   let createRecordIdentifier = $state('')
   let createRecordIdentifierError = $derived(
     validateRecordIdentifier(createRecordIdentifier, identifiers)
@@ -67,21 +85,36 @@
     editingLiveIndex = liveRecordData.findLastIndex(
       (record) => record['Identifier'] == createRecordIdentifier
     ) // probably O(1)?
-    setRecord(localRepoPath, identifier, $state.snapshot(liveRecordData[editingLiveIndex])).then(
+    saveRecord(localRepoPath, identifier, $state.snapshot(liveRecordData[editingLiveIndex])).then(
       () => {
-        editModalOpen = true
+        editRecordDataOpen = true
       }
     )
   }
+
+  $inspect(recordFlushState).with(console.log)
+
   function editRecord(editRecordIndex: number): void {
     editingLiveIndex = editRecordIndex
-    editModalOpen = true
+    editRecordDataOpen = true
   }
+
+  function initiateRepoConfigEdit(): void {
+    editRepoConfigOpen = true
+    editRepoConfigForm.editRepoConfig(
+      $state.snapshot(liveRepoConfiguration),
+      (updatedRepoConfig) => {
+        Object.assign(liveRepoConfiguration, updatedRepoConfig)
+        editRepoConfigOpen = false
+      }
+    )
+  }
+
   function removeRecord(deleteRecordIndex: number): void {
     const recordIdentifier = liveRecordData[deleteRecordIndex]['Identifier']
     deleteRecord(localRepoPath, recordIdentifier).then(() => {
-      liveRecordData.splice(deleteRecordIndex)
-      delete savedRecordData[recordIdentifier]
+      liveRecordData.splice(deleteRecordIndex, 1)
+      delete persistedRecordData[recordIdentifier]
     })
   }
 
@@ -109,37 +142,41 @@
   }
 
   function flushTick(): void {
-    for (const identifier in recordFlushTimers) {
+    for (const identifier in recordFlushState) {
       if (!modifiedRecords.find(([modifiedIdentifier]) => modifiedIdentifier == identifier)) {
-        delete recordFlushTimers[identifier]
+        // If it's no longer in modified records, remove it from recordFlushState
+        // The only time it is no longer in modified records should be after the flush promise returns.
+        delete recordFlushState[identifier]
       }
     }
     for (const [identifier, index] of modifiedRecords) {
       let liveRecordSerialized = JSON.stringify(Object.entries(liveRecordData[index]).sort())
       if (
-        !Object.hasOwn(recordFlushTimers, identifier) ||
-        recordFlushTimers[identifier][1] != liveRecordSerialized
+        !Object.hasOwn(recordFlushState, identifier) ||
+        recordFlushState[identifier][1] != liveRecordSerialized
       ) {
-        recordFlushTimers[identifier] = [saveDelay, liveRecordSerialized]
+        recordFlushState[identifier] = [saveDelay, liveRecordSerialized, false]
       }
       if (liveRecordIssueCount[index] > 0) continue
-      if (Object.hasOwn(recordFlushTimers, identifier)) {
-        recordFlushTimers[identifier][0] -=
-          recordFlushTimers[identifier][0] <= 0 ? 0 : saveTickInterval / 1000
+      if (Object.hasOwn(recordFlushState, identifier)) {
+        recordFlushState[identifier][0] -=
+          recordFlushState[identifier][0] <= 0 ? 0 : saveTickInterval / 1000
       }
-      if (recordFlushTimers[identifier][0] <= 0) {
-        flushRecord(
-          $state.snapshot(
-            liveRecordData.find((liveRecord) => liveRecord['Identifier'] == identifier)
-          )
-        )
+      if (recordFlushState[identifier][0] <= 0) {
+        let recordDataSnapshot = $state.snapshot(liveRecordData[index])
+        recordFlushState[identifier][0] = 0
+        if (!recordFlushState[identifier][2]) {
+          flushRecord(recordDataSnapshot)
+          recordFlushState[identifier][2] = true
+        }
       }
     }
   }
 
   function flushRecord(modifiedRecord: RepositoryRecordData): void {
-    setRecord(localRepoPath, modifiedRecord['Identifier'], modifiedRecord)
-    savedRecordData[modifiedRecord['Identifier']] = modifiedRecord
+    saveRecord(localRepoPath, modifiedRecord['Identifier'], modifiedRecord).then(() => {
+      persistedRecordData[modifiedRecord['Identifier']] = modifiedRecord
+    })
   }
 
   function loadRecords(): void {
@@ -147,29 +184,57 @@
     loadRecordsFromStorage(localRepoPath).then((loadedRecords) => {
       liveRecordData.push(...loadedRecords)
       for (const loadedRecord of loadedRecords) {
-        savedRecordData[loadedRecord['Identifier']] = loadedRecord
+        persistedRecordData[loadedRecord['Identifier']] = loadedRecord
       }
+    })
+  }
+
+  function flushRepoConfiguration(): void {
+    setRepoConfig(localRepoPath, liveRepoConfiguration)
+  }
+
+  function loadRepoConfiguration(): void {
+    liveRepoConfiguration.requiredMetadata = []
+    liveRepoConfiguration.exactKeys = false
+    getRepoConfig(localRepoPath).then((loadedConfig) => {
+      Object.assign(liveRepoConfiguration, loadedConfig)
     })
   }
   onMount(() => {
     loadRecords()
+    loadRepoConfiguration()
     setInterval(flushTick, saveTickInterval)
   })
 </script>
 
-<EditRecordModal
-  bind:modalOpen={editModalOpen}
-  bind:liveRecords={liveRecordData}
-  bind:liveIssues={liveRecordIssues}
-  bind:editRecordIndex={editingLiveIndex}
-/>
+<Drawer bind:open={editRepoConfigOpen} placement="bottom">
+  <ConfigureRepository bind:this={editRepoConfigForm} />
+</Drawer>
 
-<div class="w-full h-full px-4 sm:px-1">
-  <div class="mb-2">
-    <ButtonGroup>
-      <Input type="text" placeholder="Identifier" bind:value={createRecordIdentifier} />
-      <Button onclick={() => addRecord()} disabled={createDisabled}>Add</Button>
-    </ButtonGroup>
+<Drawer bind:open={editRecordDataOpen} placement="right">
+  <EditRecordData
+    bind:liveRecords={liveRecordData}
+    bind:liveIssues={liveRecordIssues}
+    bind:editRecordIndex={editingLiveIndex}
+  />
+</Drawer>
+
+<div class="w-full h-full px-4 sm:px-1 pt-4">
+  <div class="mb-2 flex justify-center">
+    <span class="mx-2">
+      <ButtonGroup>
+        <Input type="text" placeholder="Identifier" bind:value={createRecordIdentifier} />
+        <Button onclick={() => addRecord()} disabled={createDisabled}>Add</Button>
+      </ButtonGroup>
+    </span>
+    <span class="mx-2">
+      <ButtonGroup>
+        <Button onclick={initiateRepoConfigEdit}>
+          <AdjustmentsVerticalOutline />
+          Settings
+        </Button>
+      </ButtonGroup>
+    </span>
   </div>
   <div>
     <Table hoverable={true} border={true} shadow>
@@ -186,18 +251,18 @@
         <TableHeadCell>Modify</TableHeadCell>
         <TableHeadCell class="w-fit"><Checkbox /></TableHeadCell>
         <TableHeadCell>Identifier</TableHeadCell>
-        {#each cols.filter(([colName]) => colName != 'Identifier') as [colName] (colName)}
+        {#each displayedCols.filter(([colName]) => colName != 'Identifier') as [colName] (colName)}
           <TableHeadCell>{colName}</TableHeadCell>
         {/each}
       </TableHead>
       <TableBody>
-        {#each rows as row, rowIndex (row['Identifier'])}
+        {#each displayedRows as row, rowIndex (row['Identifier'])}
           <TableBodyRow class="border-gray-200" ondblclick={() => editRecord(rowIndex)}>
             <TableBodyCell>
               <!-- TODO fix the alignment issue here -->
               {#if liveRecordIssueCount[rowIndex]}
                 <ExclamationCircleOutline color="red" class="shrink-0" />
-              {:else if recordFlushTimers[rowIndex]}
+              {:else if recordFlushState[row['Identifier']]}
                 <FloppyDiskOutline color="blue" class="shrink-0" />
               {:else}
                 <CheckCircleOutline class="shrink-0" />
@@ -211,7 +276,7 @@
             </TableBodyCell>
             <TableBodyCell><Checkbox /></TableBodyCell>
             <TableBodyCell>{row['Identifier']}</TableBodyCell>
-            {#each cols.filter(([colName]) => colName != 'Identifier') as [colName], colIndex (colName)}
+            {#each displayedCols.filter(([colName]) => colName != 'Identifier') as [colName], colIndex (colName)}
               <TableBodyCell>
                 <div class="flex">
                   {#if liveRecordIssues[rowIndex][colName] && liveRecordIssues[rowIndex][colName].length}

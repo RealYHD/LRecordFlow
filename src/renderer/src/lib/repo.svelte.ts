@@ -1,5 +1,15 @@
 import { appStateStore } from "./state.svelte"
+
 export type RepositoryRecordData = Record<string, string>
+export enum MetadataValueType {
+    OPTIONS, DATE, BOOLEAN, NUMBER
+}
+
+export interface RepositoryConfiguration {
+    requiredMetadata: [string, string[] | MetadataValueType][]
+    exactKeys: boolean
+}
+
 export async function loadRecords(localRepoPath: string): Promise<RepositoryRecordData[]> {
     let records: RepositoryRecordData[] = []
     let recordNames: string[] = await window['repo'].getAllRepoRecords(localRepoPath)
@@ -14,7 +24,7 @@ export async function loadRecords(localRepoPath: string): Promise<RepositoryReco
     return records
 }
 
-export function findColumns(records: RepositoryRecordData[]): [string, string[]][] {
+export function getColumnsFromRecords(records: RepositoryRecordData[]): [string, string[]][] {
     let columns: Record<string, string[]> = {}
     columns['Identifier'] = []
     for (const record of records) {
@@ -76,8 +86,16 @@ export async function deleteRecord(localRepoPath: string, recordIdentifier: stri
     return await window['repo'].deleteRecord(localRepoPath, recordIdentifier)
 }
 
-export async function setRecord(localRepoPath: string, recordIdentifier: string, recordData: RepositoryRecordData) {
+export async function saveRecord(localRepoPath: string, recordIdentifier: string, recordData: RepositoryRecordData) {
     window['repo'].setRecord(localRepoPath, recordIdentifier, recordData)
+}
+
+export async function getRepoConfig(localRepoPath: string) {
+    return window['repo'].getRepoConfiguration(localRepoPath)
+}
+
+export async function setRepoConfig(localRepoPath: string, repoConfiguration: RepositoryConfiguration) {
+    return window['repo'].setRepoConfiguration(localRepoPath, repoConfiguration)
 }
 
 export function validateRecords(records: RepositoryRecordData[], columnTypes: Record<string, string[]> = null) {
@@ -132,4 +150,10 @@ export function validateRecordIdentifier(identifier: string, allIdentifiers: str
     return ''
 }
 
-// TODO manually IPC necessary functions and add a "receiver" on this end instead of using the IPC indexer.
+export function validateMetadataKey(key: string) {
+    let issues = $state([])
+    if (key.trim().length == 0) {
+        issues.push("Metadata key cannot be empty.")
+    }
+    return issues
+}

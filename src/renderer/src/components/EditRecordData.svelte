@@ -1,24 +1,13 @@
 <script lang="ts">
-  import {
-    Button,
-    ButtonGroup,
-    Helper,
-    Input,
-    InputAddon,
-    Label,
-    Modal,
-    Span
-  } from 'flowbite-svelte'
+  import { Button, ButtonGroup, Helper, Input, InputAddon, Label, Span } from 'flowbite-svelte'
   import { CirclePlusOutline, TrashBinOutline } from 'flowbite-svelte-icons'
   import type { RepositoryRecordData } from '../lib/repo.svelte'
 
   let {
-    modalOpen = $bindable(false),
     liveRecords = $bindable(),
     liveIssues = $bindable(),
     editRecordIndex = $bindable()
   }: {
-    modalOpen: boolean
     liveRecords: RepositoryRecordData[]
     liveIssues: Record<string, string[]>[]
     editRecordIndex: number
@@ -36,17 +25,19 @@
   }
 </script>
 
-<Modal
-  title={recordData ? `Update "${recordData['Identifier']}"` : 'Not Ready'}
-  form
-  bind:open={modalOpen}
->
-  <div class="flex flex-col px-5 sm:px-1">
+<div>
+  <h5
+    id="drawer-label"
+    class="mb-6 inline-flex items-center text-base font-semibold text-gray-500 uppercase dark:text-gray-400"
+  >
+    Edit "{recordData['Identifier']}"
+  </h5>
+
+  <div class="flex flex-col">
     {#each Object.entries(recordData).filter(([key]) => key != 'Identifier') as [key] (key)}
       <div class="mb-2">
+        <Label>{key}</Label>
         <ButtonGroup class="w-full">
-          <InputAddon class="text-nowrap overflow-hidden text-ellipsis w-4/12">{key}</InputAddon>
-          <InputAddon>:</InputAddon>
           <Input name={key} type="text" bind:value={recordData[key]} required />
           <Button color="alternative" onclick={() => delete recordData[key]}
             ><TrashBinOutline class="shrink-0" /></Button
@@ -69,7 +60,7 @@
     {/each}
     <Label class="mb-2">Add Metadata</Label>
     <ButtonGroup class="w-full">
-      <Input name="add-metadata-key" type="text" bind:value={createMetadata.key} />
+      <Input class="w-3/12" name="add-metadata-key" type="text" bind:value={createMetadata.key} />
       <InputAddon>:</InputAddon>
       <Input name="add-metadata-value" type="text" bind:value={createMetadata.value} />
       <Button color="secondary" onclick={onAddMetadata}
@@ -77,4 +68,4 @@
       >
     </ButtonGroup>
   </div>
-</Modal>
+</div>
