@@ -2,11 +2,11 @@ import { appStateStore } from "./state.svelte"
 
 export type RepositoryRecordData = Record<string, string>
 export enum MetadataValueType {
-    OPTIONS, DATE, BOOLEAN, NUMBER
+    Options = "options", Date = "date", Number = "number", Text = "text"
 }
 
 export interface RepositoryConfiguration {
-    requiredMetadata: [string, string[] | MetadataValueType][]
+    requiredMetadata: Record<string, [MetadataValueType, string[]]>
     exactKeys: boolean
 }
 
@@ -150,10 +150,29 @@ export function validateRecordIdentifier(identifier: string, allIdentifiers: str
     return ''
 }
 
-export function validateMetadataKey(key: string) {
-    let issues = $state([])
+
+
+export function validateRepoConfig(repoConfig: RepositoryConfiguration): Record<string, string[]> {
+    let issues: Record<string, string[]> = $state({})
+    for (const metadataKey in repoConfig.requiredMetadata) {
+        issues[metadataKey] = []
+        const metadataIssues = issues[metadataKey]
+        const [metadataType, options] = repoConfig.requiredMetadata[metadataKey];
+
+        if (metadataKey.trim().length == 0) {
+            metadataIssues.push("Metadata key cannot be empty.")
+        }
+    }
+    return issues
+}
+
+export function validateMetadataKey(key: string, repoConfig: RepositoryConfiguration): string[] {
+    const issues: string[] = $state([])
     if (key.trim().length == 0) {
-        issues.push("Metadata key cannot be empty.")
+        issues.push("Key cannot be empty.")
+    }
+    if (repoConfig.requiredMetadata[key]) {
+        issues.push(`"${key}" already exists.`)
     }
     return issues
 }

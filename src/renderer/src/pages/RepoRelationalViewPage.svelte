@@ -44,7 +44,7 @@
 
   let liveRecordData: RepositoryRecordData[] = $state([])
   let liveRepoConfiguration: RepositoryConfiguration = $state({
-    requiredMetadata: [],
+    requiredMetadata: {},
     exactKeys: false
   })
 
@@ -92,23 +92,12 @@
     )
   }
 
-  $inspect(recordFlushState).with(console.log)
-
   function editRecord(editRecordIndex: number): void {
     editingLiveIndex = editRecordIndex
     editRecordDataOpen = true
   }
 
-  function initiateRepoConfigEdit(): void {
-    editRepoConfigOpen = true
-    editRepoConfigForm.editRepoConfig(
-      $state.snapshot(liveRepoConfiguration),
-      (updatedRepoConfig) => {
-        Object.assign(liveRepoConfiguration, updatedRepoConfig)
-        editRepoConfigOpen = false
-      }
-    )
-  }
+  function initiateRepoConfigEdit(): void {}
 
   function removeRecord(deleteRecordIndex: number): void {
     const recordIdentifier = liveRecordData[deleteRecordIndex]['Identifier']
@@ -194,7 +183,7 @@
   }
 
   function loadRepoConfiguration(): void {
-    liveRepoConfiguration.requiredMetadata = []
+    liveRepoConfiguration.requiredMetadata = {}
     liveRepoConfiguration.exactKeys = false
     getRepoConfig(localRepoPath).then((loadedConfig) => {
       Object.assign(liveRepoConfiguration, loadedConfig)
@@ -207,8 +196,15 @@
   })
 </script>
 
-<Drawer bind:open={editRepoConfigOpen} placement="bottom">
-  <ConfigureRepository bind:this={editRepoConfigForm} />
+<Drawer bind:open={editRepoConfigOpen} placement="right">
+  <ConfigureRepository
+    repoConfig={$state.snapshot(liveRepoConfiguration)}
+    completionCallbackFn={(updatedRepoConfig) => {
+      Object.assign(liveRepoConfiguration, updatedRepoConfig)
+      editRepoConfigOpen = false
+      flushRepoConfiguration()
+    }}
+  />
 </Drawer>
 
 <Drawer bind:open={editRecordDataOpen} placement="right">
@@ -229,7 +225,12 @@
     </span>
     <span class="mx-2">
       <ButtonGroup>
-        <Button onclick={initiateRepoConfigEdit}>
+        <Button
+          onclick={() => {
+            editRepoConfigOpen = true
+            initiateRepoConfigEdit()
+          }}
+        >
           <AdjustmentsVerticalOutline />
           Settings
         </Button>
