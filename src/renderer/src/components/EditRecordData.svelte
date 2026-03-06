@@ -1,19 +1,43 @@
 <script lang="ts">
-  import { Button, ButtonGroup, Helper, Input, InputAddon, Label, Span } from 'flowbite-svelte'
+  import {
+    Button,
+    ButtonGroup,
+    Datepicker,
+    Helper,
+    Input,
+    InputAddon,
+    Label,
+    Select,
+    Span
+  } from 'flowbite-svelte'
   import { CirclePlusOutline, TrashBinOutline } from 'flowbite-svelte-icons'
-  import type { RepositoryRecordData } from '../lib/repo.svelte'
+  import {
+    MetadataValueType,
+    type RepositoryConfiguration,
+    type RepositoryRecordData
+  } from '../lib/repo.svelte'
 
   let {
+    repoConfig,
     liveRecords = $bindable(),
     liveIssues = $bindable(),
     editRecordIndex = $bindable()
   }: {
+    repoConfig: RepositoryConfiguration
     liveRecords: RepositoryRecordData[]
     liveIssues: Record<string, string[]>[]
     editRecordIndex: number
   } = $props()
   let recordData = $derived(liveRecords[editRecordIndex])
-  let issue = $derived(liveIssues[editRecordIndex])
+  let requiredKeys = $derived(repoConfig.requiredMetadata.map(({ key }) => key))
+  let metadataKeys: string[] = $derived(
+    Array.from(
+      new Set(repoConfig.requiredMetadata.map(({ key }) => key)).union(
+        new Set(Object.keys(recordData))
+      )
+    )
+  )
+  let recordIssues = $derived(liveIssues[editRecordIndex])
   let createMetadata = $state({
     key: '',
     value: ''
@@ -34,20 +58,84 @@
   </h5>
 
   <div class="flex flex-col">
-    {#each Object.entries(recordData).filter(([key]) => key != 'Identifier') as [key] (key)}
+    {#each metadataKeys.filter((key) => key != 'Identifier') as key, index (index)}
       <div class="mb-2">
         <Label>{key}</Label>
-        <ButtonGroup class="w-full">
-          <Input name={key} type="text" bind:value={recordData[key]} required />
-          <Button color="alternative" onclick={() => delete recordData[key]}
-            ><TrashBinOutline class="shrink-0" /></Button
-          >
-        </ButtonGroup>
-        {#if issue[key].length}
+        {#if !repoConfig.requiredMetadata.find(({ key: configKey }) => configKey == key)}
+          <ButtonGroup class="w-full">
+            <Input name={key} type="text" bind:value={recordData[key]} required />
+            <Button
+              color="alternative"
+              onclick={() => delete recordData[key]}
+              disabled={requiredKeys.includes(key)}
+            >
+              <TrashBinOutline class="shrink-0" />
+            </Button>
+          </ButtonGroup>
+        {:else if repoConfig.requiredMetadata.find(({ key: configKey }) => configKey == key).value.valueType == MetadataValueType.Number}
+          <ButtonGroup class="w-full">
+            <Input name={key} type="number" bind:value={recordData[key]} required />
+            <Button
+              color="alternative"
+              onclick={() => delete recordData[key]}
+              disabled={requiredKeys.includes(key)}
+            >
+              <TrashBinOutline class="shrink-0" />
+            </Button>
+          </ButtonGroup>
+        {:else if repoConfig.requiredMetadata.find(({ key: configKey }) => configKey == key).value.valueType == MetadataValueType.Options}
+          <ButtonGroup class="w-full">
+            <Select
+              name={key}
+              items={repoConfig.requiredMetadata
+                .find(({ key: configKey }) => configKey == key)
+                .value.options.map((option) => ({ value: option, name: option }))}
+              bind:value={recordData[key]}
+              required
+            />
+            <Button
+              color="alternative"
+              onclick={() => delete recordData[key]}
+              disabled={requiredKeys.includes(key)}
+            >
+              <TrashBinOutline class="shrink-0" />
+            </Button>
+          </ButtonGroup>
+        {:else if repoConfig.requiredMetadata.find(({ key: configKey }) => configKey == key).value.valueType == MetadataValueType.Date}
+          <Datepicker
+            required
+            bind:value={
+              () => new Date(recordData[key]), (v) => (recordData[key] = v.toDateString())
+            }
+          />
+          <div class="mt-2">
+            <Button
+              size="xs"
+              class="w-full"
+              color="alternative"
+              onclick={() => delete recordData[key]}
+              disabled={requiredKeys.includes(key)}
+            >
+              Delete
+            </Button>
+          </div>
+        {:else if repoConfig.requiredMetadata.find(({ key: configKey }) => configKey == key).value.valueType == MetadataValueType.Text}
+          <ButtonGroup class="w-full">
+            <Input name={key} type="text" bind:value={recordData[key]} required />
+            <Button
+              color="alternative"
+              onclick={() => delete recordData[key]}
+              disabled={requiredKeys.includes(key)}
+            >
+              <TrashBinOutline class="shrink-0" />
+            </Button>
+          </ButtonGroup>
+        {/if}
+
+        {#if recordIssues[key].length}
           <Helper color="red">
-            The following issues were found with the metadata entry:
             <ul>
-              {#each issue[key] as recordKeyIssues (recordKeyIssues)}
+              {#each recordIssues[key] as recordKeyIssues (recordKeyIssues)}
                 <li>{recordKeyIssues}</li>
               {/each}
             </ul>

@@ -144,23 +144,20 @@ export function validateRecords(records: RepositoryRecordData[], repoConfig: Rep
             for (const { key, value: valueDesc } of repoConfig.requiredMetadata) {
                 if (!recordIssues[key]) recordIssues[key] = []
                 const requiredKeyIssues = recordIssues[key]
-                if (record[key]) {
-                    switch (valueDesc.valueType) {
-                        case MetadataValueType.Date:
-                            if (!Date.parse(record[key])) requiredKeyIssues.push(`"${record[key]}" is expected to be in a date format but could not be parsed as a date.`)
-                            break;
-                        case MetadataValueType.Number:
-                            if (!Number.parseFloat(record[key])) requiredKeyIssues.push(`"${record[key]}" is expected to be a number but could not be parsed as a number.`)
-                            break;
-                        case MetadataValueType.Options:
-                            if (!valueDesc.options.includes(record[key])) requiredKeyIssues.push(`"${record[key]}" is not one of ${valueDesc.options.join(', ')}.`)
-                            break;
-                        case MetadataValueType.Text:
-                            // Nothing to do here, assume everything is text.
-                            break;
-                    }
-                } else {
-                    requiredKeyIssues.push(`Missing value for required "${key}".`)
+                let recordStringValue: string = (record[key] || '').toString()
+                switch (valueDesc.valueType) {
+                    case MetadataValueType.Date:
+                        if (!Date.parse(recordStringValue)) requiredKeyIssues.push(`"${key}" must represent a date but could not be parsed as a date.`)
+                        break;
+                    case MetadataValueType.Number:
+                        if (!Number.parseFloat(recordStringValue)) requiredKeyIssues.push(`"${key}" must be a number but could not be parsed as a number.`)
+                        break;
+                    case MetadataValueType.Options:
+                        if (!valueDesc.options.includes(recordStringValue)) requiredKeyIssues.push(`"${key}" must be one of ${valueDesc.options.join(', ')}.`)
+                        break;
+                    case MetadataValueType.Text:
+                        if (!recordStringValue || recordStringValue.trim() == '') requiredKeyIssues.push(`"${key}" is required to not be blank.`)
+                        break;
                 }
             }
         }

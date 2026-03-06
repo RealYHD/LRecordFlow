@@ -12,7 +12,8 @@
     ButtonGroup,
     Input,
     Label,
-    Select
+    Select,
+    Span
   } from 'flowbite-svelte'
   import { PlusOutline, TrashBinOutline } from 'flowbite-svelte-icons'
 
@@ -103,6 +104,8 @@
               </AccordionItem>
             {/each}
           </Accordion>
+        {:else}
+          <Span class="mx-auto py-5 px-3">No metadata associated with this record yet!</Span>
         {/if}
         <!-- TODO implement adding column configurations -->
       </div>

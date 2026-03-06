@@ -205,6 +205,7 @@
 
 <Drawer bind:open={editRecordDataOpen} placement="right">
   <EditRecordData
+    repoConfig={liveRepoConfiguration}
     bind:liveRecords={liveRecordData}
     bind:liveIssues={liveRecordIssues}
     bind:editRecordIndex={editingLiveIndex}
@@ -234,7 +235,7 @@
   </div>
   <div>
     <Table hoverable={true} border={true} shadow>
-      <TableHead>
+      <TableHead class="normal-case">
         <TableHeadCell class="w-fit">
           {#if totalIssueCount}
             <ExclamationCircleOutline class="shrink-0" />
@@ -253,7 +254,7 @@
       </TableHead>
       <TableBody>
         {#each displayedRows as row, rowIndex (row['Identifier'])}
-          <TableBodyRow class="border-gray-200" ondblclick={() => editRecord(rowIndex)}>
+          <TableBodyRow class="border-gray-200">
             <TableBodyCell>
               <!-- TODO fix the alignment issue here -->
               {#if liveRecordIssueCount[rowIndex]}
