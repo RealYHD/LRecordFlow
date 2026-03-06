@@ -60,7 +60,12 @@
   <div class="flex flex-col">
     {#each metadataKeys.filter((key) => key != 'Identifier') as key, index (index)}
       <div class="mb-2">
-        <Label>{key}</Label>
+        <Label>
+          {key}
+          {#if requiredKeys.includes(key)}
+            (required by repository)
+          {/if}
+        </Label>
         {#if !repoConfig.requiredMetadata.find(({ key: configKey }) => configKey == key)}
           <ButtonGroup class="w-full">
             <Input name={key} type="text" bind:value={recordData[key]} required />
