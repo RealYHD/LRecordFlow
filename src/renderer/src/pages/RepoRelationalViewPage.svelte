@@ -62,7 +62,6 @@
   const displayedCols: MetadataKeyValuePairDescriptor[] = $derived(
     aggregateRepositoryMetadata(liveRecordData, liveRepoConfiguration)
   )
-  $inspect(displayedCols).with(console.log)
   const identifiers = $derived(liveRecordData.map((record) => record['Identifier']))
 
   let liveRecordIssues = $derived(validateRecords(liveRecordData, liveRepoConfiguration))
@@ -156,8 +155,8 @@
         let recordDataSnapshot = $state.snapshot(liveRecordData[index])
         recordFlushState[identifier][0] = 0
         if (!recordFlushState[identifier][2]) {
-          flushRecord(recordDataSnapshot)
           recordFlushState[identifier][2] = true
+          flushRecord(recordDataSnapshot)
         }
       }
     }
@@ -191,6 +190,8 @@
     loadRepoConfiguration()
     setInterval(flushTick, saveTickInterval)
   })
+
+  $inspect(recordFlushState).with(console.log)
 </script>
 
 <Drawer

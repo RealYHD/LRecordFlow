@@ -110,7 +110,8 @@
           <Datepicker
             required
             bind:value={
-              () => new Date(recordData[key]), (v) => (recordData[key] = v.toDateString())
+              () => (isNaN(Date.parse(recordData[key])) ? undefined : new Date(recordData[key])),
+              (v) => (recordData[key] = v.toDateString())
             }
           />
           <div class="mt-2">

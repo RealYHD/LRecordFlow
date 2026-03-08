@@ -180,9 +180,10 @@ export function countIssues(recordIssues: Record<string, string[]>[]) {
 
 export function validateRecordIdentifier(identifier: string, allIdentifiers: string[]) {
     // TODO validate that it is a valid path
-    if (!identifier) {
+    if (identifier.trim().length <= 0) {
         return "Identifier cannot be blank"
     }
+    if (identifier.trim().length != identifier.length) return "Identifier must not have leading or lagging spaces"
     if (allIdentifiers.includes(identifier)) {
         return "Identifier is already in use"
     }
