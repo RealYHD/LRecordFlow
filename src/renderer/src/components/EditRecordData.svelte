@@ -12,31 +12,25 @@
   } from 'flowbite-svelte'
   import { CirclePlusOutline, TrashBinOutline } from 'flowbite-svelte-icons'
   import {
+    identifierKey,
     MetadataValueType,
-    type RepositoryConfiguration,
+    type MetadataDescriptor,
     type RepositoryRecordData
   } from '../lib/repo.svelte'
 
   let {
-    repoConfig,
+    metadataDescriptors,
     liveRecords = $bindable(),
     liveIssues = $bindable(),
     editRecordIndex = $bindable()
   }: {
-    repoConfig: RepositoryConfiguration
+    metadataDescriptors: MetadataDescriptor[]
     liveRecords: RepositoryRecordData[]
     liveIssues: Record<string, string[]>[]
     editRecordIndex: number
   } = $props()
   let recordData = $derived(liveRecords[editRecordIndex])
-  let requiredKeys = $derived(repoConfig.requiredMetadata.map(({ key }) => key))
-  let metadataKeys: string[] = $derived(
-    Array.from(
-      new Set(repoConfig.requiredMetadata.map(({ key }) => key)).union(
-        new Set(Object.keys(recordData))
-      )
-    )
-  )
+
   let recordIssues = $derived(liveIssues[editRecordIndex])
   let createMetadata = $state({
     key: '',
@@ -54,59 +48,30 @@
     id="drawer-label"
     class="mb-6 inline-flex items-center text-base font-semibold text-gray-500 uppercase dark:text-gray-400"
   >
-    Edit "{recordData['Identifier']}"
+    Edit "{recordData[identifierKey]}"
   </h5>
 
   <div class="flex flex-col">
-    {#each metadataKeys.filter((key) => key != 'Identifier') as key, index (index)}
+    {#each metadataDescriptors.filter(({ key }) => key != identifierKey) as { key, required, value }, index (index)}
       <div class="mb-2">
         <Label>
           {key}
-          {#if requiredKeys.includes(key)}
-            (required by repository)
+          {#if required}
+            (Required by Repository)
+          {:else if !recordData[key]}
+            (Defined by Other Record)
           {/if}
         </Label>
-        {#if !repoConfig.requiredMetadata.find(({ key: configKey }) => configKey == key)}
-          <ButtonGroup class="w-full">
-            <Input name={key} type="text" bind:value={recordData[key]} required />
-            <Button
-              color="alternative"
-              onclick={() => delete recordData[key]}
-              disabled={requiredKeys.includes(key)}
-            >
-              <TrashBinOutline class="shrink-0" />
-            </Button>
-          </ButtonGroup>
-        {:else if repoConfig.requiredMetadata.find(({ key: configKey }) => configKey == key).value.valueType == MetadataValueType.Number}
-          <ButtonGroup class="w-full">
-            <Input name={key} type="number" bind:value={recordData[key]} required />
-            <Button
-              color="alternative"
-              onclick={() => delete recordData[key]}
-              disabled={requiredKeys.includes(key)}
-            >
-              <TrashBinOutline class="shrink-0" />
-            </Button>
-          </ButtonGroup>
-        {:else if repoConfig.requiredMetadata.find(({ key: configKey }) => configKey == key).value.valueType == MetadataValueType.Options}
-          <ButtonGroup class="w-full">
-            <Select
-              name={key}
-              items={repoConfig.requiredMetadata
-                .find(({ key: configKey }) => configKey == key)
-                .value.options.map((option) => ({ value: option, name: option }))}
-              bind:value={recordData[key]}
-              required
-            />
-            <Button
-              color="alternative"
-              onclick={() => delete recordData[key]}
-              disabled={requiredKeys.includes(key)}
-            >
-              <TrashBinOutline class="shrink-0" />
-            </Button>
-          </ButtonGroup>
-        {:else if repoConfig.requiredMetadata.find(({ key: configKey }) => configKey == key).value.valueType == MetadataValueType.Date}
+        {#if value.valueType == MetadataValueType.Number}
+          <Input name={key} type="number" bind:value={recordData[key]} required />
+        {:else if value.valueType == MetadataValueType.Options}
+          <Select
+            name={key}
+            items={value.options.map((option) => ({ value: option, name: option }))}
+            bind:value={recordData[key]}
+            required
+          />
+        {:else if value.valueType == MetadataValueType.Date}
           <Datepicker
             required
             bind:value={
@@ -114,28 +79,8 @@
               (v) => (recordData[key] = v.toDateString())
             }
           />
-          <div class="mt-2">
-            <Button
-              size="xs"
-              class="w-full"
-              color="alternative"
-              onclick={() => delete recordData[key]}
-              disabled={requiredKeys.includes(key)}
-            >
-              Delete
-            </Button>
-          </div>
-        {:else if repoConfig.requiredMetadata.find(({ key: configKey }) => configKey == key).value.valueType == MetadataValueType.Text}
-          <ButtonGroup class="w-full">
-            <Input name={key} type="text" bind:value={recordData[key]} required />
-            <Button
-              color="alternative"
-              onclick={() => delete recordData[key]}
-              disabled={requiredKeys.includes(key)}
-            >
-              <TrashBinOutline class="shrink-0" />
-            </Button>
-          </ButtonGroup>
+        {:else if value.valueType == MetadataValueType.Text}
+          <Input name={key} type="text" bind:value={recordData[key]} required />
         {/if}
 
         {#if recordIssues[key].length}
@@ -147,9 +92,21 @@
             </ul>
           </Helper>
         {/if}
+        {#if recordData[key]}
+          <div class="mt-2">
+            <Button
+              size="xs"
+              class="w-full"
+              color="alternative"
+              onclick={() => delete recordData[key]}
+              disabled={required}
+            >
+              <TrashBinOutline /> Delete
+            </Button>
+          </div>
+        {/if}
       </div>
     {:else}
-      <!-- TODO add indication that there's no metadata here! -->
       <Span class="mx-auto py-5 px-3">No metadata associated with this record yet!</Span>
     {/each}
     <Label class="mb-2">Add Metadata</Label>

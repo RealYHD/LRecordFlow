@@ -10,6 +10,7 @@
     AccordionItem,
     Button,
     ButtonGroup,
+    Checkbox,
     Input,
     Label,
     Select,
@@ -42,65 +43,73 @@
     <div class="mb-4 flex flex-1">
       <div>
         <div class="mb-4">
-          <Label class="mb-2">Add key requirement</Label>
+          <Label class="mb-2">Define metadata</Label>
           <ButtonGroup>
             <Input bind:value={metadataKeyToAdd} placeholder="key" />
             <Button
               onclick={() =>
-                repoConfig.requiredMetadata.push({
+                repoConfig.defined.push({
                   key: metadataKeyToAdd,
                   value: {
                     valueType: MetadataValueType.Text,
                     options: []
-                  }
+                  },
+                  required: false
                 })}
               disabled={Boolean(metadataKeyIssues.length)}><PlusOutline /></Button
             >
           </ButtonGroup>
         </div>
-        {#if repoConfig.requiredMetadata.length}
+        {#if repoConfig.defined.length}
           <Accordion flush>
-            {#each repoConfig.requiredMetadata as metadataKeyValueDescriptor, index (index)}
+            {#each repoConfig.defined as metadataKeyValueDescriptor, index (index)}
               <AccordionItem>
                 {#snippet header()}Configure "{metadataKeyValueDescriptor.key}"{/snippet}
-                <Label class="mb-2">Set value type</Label>
-                <Select
-                  class="mt-2"
-                  items={Object.entries(MetadataValueType).map(([name, value]) => ({
-                    value,
-                    name
-                  }))}
-                  bind:value={repoConfig.requiredMetadata[index].value.valueType}
-                />
-                {#if repoConfig.requiredMetadata[index].value.valueType == MetadataValueType.Options}
-                  <div class="mt-2 space-y-2">
-                    <Label class="mb-2">Add option</Label>
-                    <ButtonGroup>
-                      <Input id="" bind:value={metadataKeyOptionToAdd} />
-                      <Button
-                        onclick={() =>
-                          repoConfig.requiredMetadata[index].value.options.push(
-                            metadataKeyOptionToAdd
-                          )}
-                        disabled={repoConfig.requiredMetadata[index].value.options.includes(
-                          metadataKeyOptionToAdd
-                        )}><PlusOutline /></Button
-                      >
-                    </ButtonGroup>
-                    {#each { length: repoConfig.requiredMetadata[index].value.options.length }, optionIndex}
+                <div class="space-y-2">
+                  <div>
+                    <Label class="mb-2">Set value type</Label>
+                    <Select
+                      class="mt-2"
+                      items={Object.entries(MetadataValueType).map(([name, value]) => ({
+                        value,
+                        name
+                      }))}
+                      bind:value={repoConfig.defined[index].value.valueType}
+                    />
+                  </div>
+                  <div>
+                    <Checkbox bind:checked={repoConfig.defined[index].required}>Required</Checkbox>
+                  </div>
+                  {#if repoConfig.defined[index].value.valueType == MetadataValueType.Options}
+                    <div class="mt-2 space-y-2">
+                      <Label>Add option</Label>
                       <ButtonGroup>
-                        <Input
-                          bind:value={repoConfig.requiredMetadata[index].value.options[optionIndex]}
-                        />
+                        <Input id="" bind:value={metadataKeyOptionToAdd} />
                         <Button
-                          onclick={() =>
-                            repoConfig.requiredMetadata[index].value.options.splice(optionIndex, 1)}
-                          ><TrashBinOutline /></Button
+                          onclick={() => {
+                            metadataKeyOptionToAdd = ''
+                            repoConfig.defined[index].value.options.push(metadataKeyOptionToAdd)
+                          }}
+                          disabled={repoConfig.defined[index].value.options.includes(
+                            metadataKeyOptionToAdd
+                          )}><PlusOutline /></Button
                         >
                       </ButtonGroup>
-                    {/each}
-                  </div>
-                {/if}
+                      {#each { length: repoConfig.defined[index].value.options.length }, optionIndex}
+                        <ButtonGroup>
+                          <Input
+                            bind:value={repoConfig.defined[index].value.options[optionIndex]}
+                          />
+                          <Button
+                            onclick={() =>
+                              repoConfig.defined[index].value.options.splice(optionIndex, 1)}
+                            ><TrashBinOutline /></Button
+                          >
+                        </ButtonGroup>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
               </AccordionItem>
             {/each}
           </Accordion>
