@@ -46,6 +46,7 @@ export function aggregateMetadataDescriptors(records: RepositoryRecordData[], re
         for (const recordKey in record) {
             if (recordKey == identifierKey) continue
             if (included.has(recordKey)) continue
+            included.add(recordKey)
             descriptors.push({
                 key: recordKey,
                 required: false,

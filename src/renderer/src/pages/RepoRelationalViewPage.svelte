@@ -55,7 +55,7 @@
 
   const saveDelay = 2
   const saveTickInterval = 100
-  const persistedRecordData: Record<string, RepositoryRecordData> = $state({})
+  const persistedRecordData: Record<string, string> = $state({})
   const modifiedRecords: [string, number][] = $derived(
     calcModifiedRecords(liveRecordData, persistedRecordData)
   )
@@ -88,11 +88,7 @@
     editingLiveIndex = liveRecordData.findLastIndex(
       (record) => record[identifierKey] == createRecordIdentifier
     ) // probably O(1)?
-    saveRecord(localRepoPath, identifier, $state.snapshot(liveRecordData[editingLiveIndex])).then(
-      () => {
-        editRecordDataOpen = true
-      }
-    )
+    editRecordDataOpen = true
   }
 
   function editRecord(editRecordIndex: number): void {
@@ -110,24 +106,26 @@
 
   function calcModifiedRecords(
     liveRecords: RepositoryRecordData[],
-    flushedRecordsSnapshot: Record<string, RepositoryRecordData>
+    flushedRecordsSnapshot: Record<string, string>
   ): [string, number][] {
     let changedRecordIdentifiers: [string, number][] = $state([])
     for (const [index, liveRecord] of liveRecords.entries()) {
       if (!Object.hasOwn(flushedRecordsSnapshot, liveRecord[identifierKey])) {
         // Accounts for new records
+        console.log('new record detected')
         changedRecordIdentifiers.push([liveRecord[identifierKey], index])
-        continue
-      }
-      if (
-        JSON.stringify(
-          Object.entries(flushedRecordsSnapshot[liveRecord[identifierKey]]).toSorted()
-        ) != JSON.stringify(Object.entries($state.snapshot(liveRecord)).toSorted())
+      } else if (
+        flushedRecordsSnapshot[liveRecord[identifierKey]] !=
+        JSON.stringify(Object.entries($state.snapshot(liveRecord)).toSorted())
       ) {
+        console.log(`${liveRecord[identifierKey]} is different.`)
         changedRecordIdentifiers.push([liveRecord[identifierKey], index])
-        continue
+      } else {
+        // technically nothing but good for logging
+        console.log(`${liveRecord[identifierKey]} has not changed.`)
       }
     }
+    console.log('Completed calculating modified records')
     return changedRecordIdentifiers
   }
 
@@ -153,29 +151,44 @@
           recordFlushState[identifier][0] <= 0 ? 0 : saveTickInterval / 1000
       }
       if (recordFlushState[identifier][0] <= 0) {
-        let recordDataSnapshot = $state.snapshot(liveRecordData[index])
         recordFlushState[identifier][0] = 0
         if (!recordFlushState[identifier][2]) {
           recordFlushState[identifier][2] = true
-          flushRecord(recordDataSnapshot)
+          flushRecord(liveRecordData[index])
         }
       }
     }
   }
 
   function flushRecord(modifiedRecord: RepositoryRecordData): void {
-    saveRecord(localRepoPath, modifiedRecord[identifierKey], modifiedRecord).then(() => {
-      persistedRecordData[modifiedRecord[identifierKey]] = modifiedRecord
-    })
+    saveRecord(localRepoPath, modifiedRecord[identifierKey], $state.snapshot(modifiedRecord)).then(
+      () => {
+        console.log(`${modifiedRecord[identifierKey]} has been flushed`)
+        modifiedRecords.splice(
+          modifiedRecords.findIndex(
+            ([modifiedIdentifier]) => modifiedIdentifier == modifiedRecord[identifierKey]
+          ),
+          1
+        )
+        Object.assign(persistedRecordData, {
+          [modifiedRecord[identifierKey]]: JSON.stringify(
+            Object.entries($state.snapshot(modifiedRecord)).toSorted()
+          )
+        })
+      }
+    )
   }
 
   function loadRecords(): void {
     liveRecordData.length = 0
     loadRecordsFromStorage(localRepoPath).then((loadedRecords) => {
-      liveRecordData.push(...loadedRecords)
       for (const loadedRecord of loadedRecords) {
-        persistedRecordData[loadedRecord[identifierKey]] = loadedRecord
+        console.log('set persistence')
+        persistedRecordData[loadedRecord[identifierKey]] = JSON.stringify(
+          Object.entries($state.snapshot(loadedRecord)).toSorted()
+        )
       }
+      liveRecordData.push(...loadedRecords)
     })
   }
 
@@ -191,6 +204,10 @@
     loadRepoConfiguration()
     setInterval(flushTick, saveTickInterval)
   })
+
+  $inspect(persistedRecordData).with(console.log)
+  $inspect(modifiedRecords).with(console.log)
+  $inspect(recordFlushState).with(console.log)
 </script>
 
 <Drawer
@@ -258,11 +275,29 @@
             <TableBodyCell>
               <!-- TODO fix the alignment issue here -->
               {#if liveRecordIssueCount[rowIndex]}
-                <ExclamationCircleOutline color="red" class="shrink-0" />
+                <ExclamationCircleOutline
+                  color="red"
+                  class="shrink-0"
+                  id={`row-issues-indicator-${rowIndex}`}
+                />
+                <Popover triggeredBy={`#row-issues-indicator-${rowIndex}`}>
+                  {liveRecordIssueCount[rowIndex]} issue(s) found with metadata associated with this record.
+                  Updates will not be saved until fixed.
+                </Popover>
               {:else if recordFlushState[row[identifierKey]]}
-                <FloppyDiskOutline color="blue" class="shrink-0" />
+                <FloppyDiskOutline
+                  color="blue"
+                  class="shrink-0"
+                  id={`row-saving-indicator-${rowIndex}`}
+                />
+                <Popover triggeredBy={`#row-saving-indicator-${rowIndex}`}>
+                  Saving record in {recordFlushState[row[identifierKey]][0]} seconds...
+                </Popover>
               {:else}
-                <CheckCircleOutline class="shrink-0" />
+                <CheckCircleOutline class="shrink-0" id={`row-saved-indicator-${rowIndex}`} />
+                <Popover triggeredBy={`#row-saved-indicator-${rowIndex}`}>
+                  No issues found and record is saved on local storage.
+                </Popover>
               {/if}
             </TableBodyCell>
             <TableBodyCell>
@@ -280,9 +315,9 @@
                     <ExclamationCircleOutline
                       color="red"
                       class="shrink-0"
-                      id={`table-issue-${rowIndex}-${colIndex}`}
+                      id={`cell-issues-${rowIndex}-${colIndex}`}
                     />
-                    <Popover triggeredBy={`#table-issue-${rowIndex}-${colIndex}`}>
+                    <Popover triggeredBy={`#cell-issues-${rowIndex}-${colIndex}`}>
                       <ul>
                         {#each liveRecordIssues[rowIndex][key] as issue (issue)}
                           <li>{issue}</li>
