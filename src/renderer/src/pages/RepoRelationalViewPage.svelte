@@ -5,7 +5,6 @@
     countIssues,
     deleteRecord,
     getRepoConfig,
-    identifierKey,
     loadRecords as loadRecordsFromStorage,
     openRepoRecordDirectory,
     recordDataIsEqual,
@@ -15,7 +14,8 @@
     validateRecords,
     type MetadataDescriptor,
     type RepositoryConfiguration,
-    type RepositoryRecordData
+    type RecordMetadata,
+    type RepositoryRecord
   } from '../lib/repo.svelte'
   import {
     Button,
@@ -53,30 +53,30 @@
     defined: [],
     exactKeys: false
   })
-  let liveRecordData: RepositoryRecordData[] = $state([])
+  let liveRepoRecords: RepositoryRecord[] = $state([])
   let liveMetadataDescriptors: MetadataDescriptor[] = $derived(
-    aggregateMetadataDescriptors(liveRecordData, liveRepoConfiguration)
+    aggregateMetadataDescriptors(liveRepoRecords, liveRepoConfiguration)
   )
-  let liveRecordIdentifiers: Record<string, RepositoryRecordData> = $derived(
-    Object.fromEntries(liveRecordData.map((recordData) => [recordData[identifierKey], recordData]))
+  let liveRepoRecordsById: Record<string, RepositoryRecord> = $derived(
+    Object.fromEntries(liveRepoRecords.map((recordData) => [recordData.identifier, recordData]))
   )
 
   const flushDelay = 2 * 1000
   const flushTickInterval = 1000
-  const persistedRecordData: Record<string, RepositoryRecordData> = $state({})
+  const persistedRecordMetadata: Record<string, RecordMetadata> = $state({})
   const modifiedRecords: SvelteSet<string> = $derived(
-    calcModifiedRecords(liveRecordData, persistedRecordData)
+    calcModifiedRecords(liveRepoRecords, persistedRecordMetadata)
   )
   const recordFlushDelays: Record<
     string,
-    { delay: number; flushing: boolean; snapshot: RepositoryRecordData }
+    { delay: number; flushing: boolean; snapshot: RecordMetadata }
   > = $state({})
   let flushIntervalTimerId = -1
 
-  const displayedRows: RepositoryRecordData[] = $derived(liveRecordData) // TODO do something with this...
+  const displayedRows: RepositoryRecord[] = $derived(liveRepoRecords) // TODO do something with this...
   const displayedMetadata: MetadataDescriptor[] = $derived(liveMetadataDescriptors)
 
-  let liveRecordIssues = $derived(validateRecords(liveRecordData, liveMetadataDescriptors))
+  let liveRecordIssues = $derived(validateRecords(liveRepoRecords, liveMetadataDescriptors))
   const liveRecordIssueCount = $derived(countIssues(liveRecordIssues))
   let totalIssueCount: number = $derived(
     Object.values(liveRecordIssueCount).reduce((total, current) => total + current, 0)
@@ -87,16 +87,20 @@
 
   let createRecordIdentifier = $state('')
   let createRecordIdentifierError = $derived(
-    validateRecordIdentifier(createRecordIdentifier, Object.keys(liveRecordIdentifiers))
+    validateRecordIdentifier(createRecordIdentifier, Object.keys(liveRepoRecordsById))
   )
   let createPending: boolean = $state(false)
   let createDisabled: boolean = $derived(createRecordIdentifierError.length > 0 || createPending)
 
   function addRecord(): void {
     const identifier = $state.snapshot(createRecordIdentifier)
-    liveRecordData.push({ Identifier: identifier })
-    editingLiveIndex = liveRecordData.findLastIndex(
-      (record) => record[identifierKey] == createRecordIdentifier
+    liveRepoRecords.push({
+      identifier: identifier,
+      metadata: {},
+      files: []
+    })
+    editingLiveIndex = liveRepoRecords.findLastIndex(
+      (record) => record.identifier == createRecordIdentifier
     ) // probably O(1)?
     editRecordDataOpen = true
   }
@@ -107,56 +111,58 @@
   }
 
   function removeRecord(deleteRecordIndex: number): void {
-    const recordIdentifier = liveRecordData[deleteRecordIndex][identifierKey]
+    const recordIdentifier = liveRepoRecords[deleteRecordIndex].identifier
     deleteRecord(localRepoPath, recordIdentifier).then(() => {
-      liveRecordData.splice(deleteRecordIndex, 1)
-      delete persistedRecordData[recordIdentifier]
+      liveRepoRecords.splice(deleteRecordIndex, 1)
+      delete persistedRecordMetadata[recordIdentifier]
     })
   }
 
   function calcModifiedRecords(
-    liveRecords: RepositoryRecordData[],
-    persistedRecordData: Record<string, RepositoryRecordData>
+    liveRecords: RepositoryRecord[],
+    persistedRecordData: Record<string, RecordMetadata>
   ): SvelteSet<string> {
     let modifiedRecords: SvelteSet<string> = new SvelteSet()
     for (const liveRecord of liveRecords) {
       if (
         !recordDataIsEqual(
-          $state.snapshot(liveRecord),
-          $state.snapshot(persistedRecordData[liveRecord[identifierKey]])
+          $state.snapshot(liveRecord.metadata),
+          $state.snapshot(persistedRecordData[liveRecord.identifier])
         )
       ) {
-        modifiedRecords.add(liveRecord[identifierKey])
+        modifiedRecords.add(liveRecord.identifier)
       }
     }
     return modifiedRecords
   }
 
-  function flushRecord(modifiedRecord: RepositoryRecordData): void {
-    saveRecord(localRepoPath, modifiedRecord[identifierKey], $state.snapshot(modifiedRecord)).then(
-      () => {
-        delete recordFlushDelays[modifiedRecord[identifierKey]]
-        modifiedRecords.delete(modifiedRecord[identifierKey])
-        persistedRecordData[modifiedRecord[identifierKey]] = $state.snapshot(modifiedRecord)
-      }
-    )
+  function flushRecord(recordIdentifier: string): void {
+    let modifiedRecord = liveRepoRecordsById[recordIdentifier]
+    saveRecord(
+      localRepoPath,
+      modifiedRecord.identifier,
+      $state.snapshot(modifiedRecord.metadata)
+    ).then(() => {
+      delete recordFlushDelays[modifiedRecord.identifier]
+      modifiedRecords.delete(modifiedRecord.identifier)
+      persistedRecordMetadata[modifiedRecord.identifier] = $state.snapshot(modifiedRecord.metadata)
+    })
   }
 
   function flushAllModifiedRecords(): void {
     for (const modifiedRecordId of modifiedRecords) {
       if (liveRecordIssueCount[modifiedRecordId]) continue
-      flushRecord($state.snapshot(liveRecordIdentifiers[modifiedRecordId]))
+      flushRecord(modifiedRecordId)
     }
   }
 
   function loadRecords(): void {
-    liveRecordData.length = 0
+    liveRepoRecords.length = 0 // Delete entire array without re-instantiating
     loadRecordsFromStorage(localRepoPath).then((loadedRecords) => {
       for (const loadedRecord of loadedRecords) {
-        console.log('set persistence')
-        persistedRecordData[loadedRecord[identifierKey]] = $state.snapshot(loadedRecord)
+        persistedRecordMetadata[loadedRecord.identifier] = $state.snapshot(loadedRecord.metadata)
       }
-      liveRecordData.push(...loadedRecords)
+      liveRepoRecords.push(...loadedRecords)
     })
   }
 
@@ -174,13 +180,13 @@
       if (recordFlushDelays[modifiedRecordId]) {
         if (
           !recordDataIsEqual(
-            $state.snapshot(liveRecordIdentifiers[modifiedRecordId]),
+            $state.snapshot(liveRepoRecordsById[modifiedRecordId].metadata),
             recordFlushDelays[modifiedRecordId].snapshot
           )
         ) {
           recordFlushDelays[modifiedRecordId].delay = flushDelay
           recordFlushDelays[modifiedRecordId].snapshot = $state.snapshot(
-            liveRecordIdentifiers[modifiedRecordId]
+            liveRepoRecordsById[modifiedRecordId].metadata
           )
           recordFlushDelays[modifiedRecordId].flushing = false
         } else if (
@@ -188,7 +194,7 @@
           !recordFlushDelays[modifiedRecordId].flushing
         ) {
           recordFlushDelays[modifiedRecordId].flushing = true
-          flushRecord($state.snapshot(liveRecordIdentifiers[modifiedRecordId]))
+          flushRecord(modifiedRecordId)
         } else {
           recordFlushDelays[modifiedRecordId].delay -= flushTickInterval
           if (recordFlushDelays[modifiedRecordId].delay <= 0)
@@ -197,7 +203,7 @@
       } else {
         recordFlushDelays[modifiedRecordId] = {
           delay: flushDelay,
-          snapshot: $state.snapshot(liveRecordIdentifiers[modifiedRecordId]),
+          snapshot: $state.snapshot(liveRepoRecordsById[modifiedRecordId].metadata),
           flushing: false
         }
       }
@@ -231,7 +237,7 @@
 <Drawer bind:open={editRecordDataOpen} placement="right">
   <EditRecordData
     metadataDescriptors={liveMetadataDescriptors}
-    bind:liveRecords={liveRecordData}
+    bind:liveRecords={liveRepoRecords}
     bind:liveIssues={liveRecordIssues}
     bind:editRecordIndex={editingLiveIndex}
   />
@@ -278,36 +284,36 @@
         <TableHeadCell>Modify</TableHeadCell>
         <TableHeadCell class="w-fit"><Checkbox /></TableHeadCell>
         <TableHeadCell>Identifier</TableHeadCell>
-        {#each displayedMetadata.filter(({ key }) => key != identifierKey) as { key } (key)}
+        {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key } (key)}
           <TableHeadCell>{key}</TableHeadCell>
         {/each}
       </TableHead>
       <TableBody>
-        {#each displayedRows as row, rowIndex (row[identifierKey])}
+        {#each displayedRows as { identifier, metadata }, rowIndex (rowIndex)}
           <TableBodyRow class="border-gray-200">
             <TableBodyCell>
               <!-- TODO fix the alignment issue here -->
-              {#if liveRecordIssueCount[row[identifierKey]]}
+              {#if liveRecordIssueCount[identifier]}
                 <ExclamationCircleOutline color="red" class="shrink-0" />
                 <Popover>
-                  {liveRecordIssueCount[row[identifierKey]]} issue(s) found with metadata associated with
-                  this record. Updates will not be saved until fixed.
+                  {liveRecordIssueCount[identifier]} issue(s) found with metadata associated with this
+                  record. Updates will not be saved until fixed.
                 </Popover>
-              {:else if recordFlushDelays[row[identifierKey]]}
+              {:else if recordFlushDelays[identifier]}
                 <FloppyDiskOutline color="blue" class="shrink-0" />
                 <Popover>
-                  Saving record in {recordFlushDelays[row[identifierKey]].delay} seconds...
+                  Saving record in {recordFlushDelays[identifier].delay} seconds...
                 </Popover>
               {:else}
-                <CheckCircleOutline class="shrink-0" id={`row-saved-indicator-${rowIndex}`} />
+                <CheckCircleOutline class="shrink-0" />
                 <Popover>No issues found and record is saved on local storage.</Popover>
               {/if}
             </TableBodyCell>
             <TableBodyCell>
-              <ButtonGroup>
+              <ButtonGroup class="w-fit">
                 <Button onclick={() => editRecord(rowIndex)}><EditOutline /></Button>
                 <Tooltip>Edit Record Metadata</Tooltip>
-                <Button onclick={() => openRepoRecordDirectory(localRepoPath, row[identifierKey])}>
+                <Button onclick={() => openRepoRecordDirectory(localRepoPath, identifier)}>
                   <FolderArrowRightOutline />
                 </Button>
                 <Tooltip>Open Record Directory</Tooltip>
@@ -316,21 +322,21 @@
               </ButtonGroup>
             </TableBodyCell>
             <TableBodyCell><Checkbox /></TableBodyCell>
-            <TableBodyCell>{row[identifierKey]}</TableBodyCell>
-            {#each displayedMetadata.filter(({ key }) => key != identifierKey) as { key }, colIndex (colIndex)}
+            <TableBodyCell>{identifier}</TableBodyCell>
+            {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key }, colIndex (colIndex)}
               <TableBodyCell>
                 <div class="flex">
-                  {#if liveRecordIssues[row[identifierKey]][key] && liveRecordIssues[row[identifierKey]][key].length}
+                  {#if liveRecordIssues[identifier][key] && liveRecordIssues[identifier][key].length}
                     <ExclamationCircleOutline color="red" class="shrink-0" />
                     <Popover>
                       <ul>
-                        {#each liveRecordIssues[row[identifierKey]][key] as issue (issue)}
+                        {#each liveRecordIssues[identifier][key] as issue (issue)}
                           <li>{issue}</li>
                         {/each}
                       </ul>
                     </Popover>
                   {/if}
-                  {row[key]}
+                  {metadata[key]}
                 </div>
               </TableBodyCell>
             {/each}

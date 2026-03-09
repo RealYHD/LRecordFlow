@@ -12,10 +12,9 @@
   } from 'flowbite-svelte'
   import { CirclePlusOutline, TrashBinOutline } from 'flowbite-svelte-icons'
   import {
-    identifierKey,
     MetadataValueType,
     type MetadataDescriptor,
-    type RepositoryRecordData
+    type RepositoryRecord
   } from '../lib/repo.svelte'
 
   let {
@@ -25,13 +24,13 @@
     editRecordIndex = $bindable()
   }: {
     metadataDescriptors: MetadataDescriptor[]
-    liveRecords: RepositoryRecordData[]
+    liveRecords: RepositoryRecord[]
     liveIssues: Record<string, Record<string, string[]>>
     editRecordIndex: number
   } = $props()
   let recordData = $derived(liveRecords[editRecordIndex])
 
-  let recordIssues = $derived(liveIssues[liveRecords[editRecordIndex][identifierKey]])
+  let recordIssues = $derived(liveIssues[liveRecords[editRecordIndex].identifier])
   let createMetadata = $state({
     key: '',
     value: ''
@@ -48,39 +47,47 @@
     id="drawer-label"
     class="mb-6 inline-flex items-center text-base font-semibold text-gray-500 uppercase dark:text-gray-400"
   >
-    Edit "{recordData[identifierKey]}"
+    Edit "{recordData.identifier}"
   </h5>
 
   <div class="flex flex-col">
-    {#each metadataDescriptors.filter(({ key }) => key != identifierKey) as { key, required, value }, index (index)}
+    {#each metadataDescriptors.filter(({ key }) => key != 'Identifier') as { key, required, value }, index (index)}
       <div class="mb-2">
         <Label>
           {key}
           {#if required}
             (Required by Repository)
-          {:else if !recordData[key]}
+          {:else if !recordData.metadata[key]}
             (Defined by Other Record)
           {/if}
         </Label>
         {#if value.valueType == MetadataValueType.Number}
-          <Input name={key} type="number" bind:value={recordData[key]} required />
+          <Input name={key} type="number" bind:value={recordData.metadata[key]} required />
         {:else if value.valueType == MetadataValueType.Options}
           <Select
             name={key}
             items={value.options.map((option) => ({ value: option, name: option }))}
-            bind:value={recordData[key]}
+            bind:value={recordData.metadata[key]}
             required
           />
         {:else if value.valueType == MetadataValueType.Date}
           <Datepicker
             required
             bind:value={
-              () => (isNaN(Date.parse(recordData[key])) ? undefined : new Date(recordData[key])),
-              (v) => (recordData[key] = v.toDateString())
+              () =>
+                isNaN(Date.parse(recordData[key])) ? undefined : new Date(recordData.metadata[key]),
+              (v) => (recordData.metadata[key] = v.toDateString())
             }
           />
         {:else if value.valueType == MetadataValueType.Text}
-          <Input name={key} type="text" bind:value={recordData[key]} required />
+          <Input name={key} type="text" bind:value={recordData.metadata[key]} required />
+        {:else if value.valueType == MetadataValueType.File}
+          <Select
+            name={key}
+            items={recordData.files.map((filename) => ({ value: filename, name: filename }))}
+            bind:value={recordData.metadata[key]}
+            required
+          />
         {/if}
 
         {#if recordIssues[key].length}
@@ -92,13 +99,13 @@
             </ul>
           </Helper>
         {/if}
-        {#if recordData[key]}
+        {#if recordData.metadata[key]}
           <div class="mt-2">
             <Button
               size="xs"
               class="w-full"
               color="alternative"
-              onclick={() => delete recordData[key]}
+              onclick={() => delete recordData.metadata[key]}
               disabled={required}
             >
               <TrashBinOutline /> Delete

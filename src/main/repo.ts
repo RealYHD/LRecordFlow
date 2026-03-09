@@ -1,5 +1,5 @@
 import simpleGit, { GitResponseError, MergeResult, TaskOptions } from "simple-git";
-import fs, { mkdir } from 'fs/promises';
+import fs, { copyFile, mkdir, rm } from 'fs/promises';
 import path from "path";
 import { shell } from "electron";
 
@@ -147,4 +147,22 @@ export async function openRepoDirectory(localRepoPath: string) {
 
 export async function openRepoRecordDirectory(localRepoPath: string, recordIdentifier: string) {
     return await shell.openPath(path.join(localRepoPath, recordIdentifier))
+}
+
+export async function getFilesAssociatedWithRecord(localRepoPath: string, recordIdentifier: string) {
+    return (await fs.readdir(path.join(localRepoPath, recordIdentifier), { recursive: false, withFileTypes: true }))
+        .filter((entry) => entry.isFile() && entry.name != recordMetadataFilename)
+        .map((entry) => entry.name)
+}
+
+export async function putFileInRecord(localRepoPath: string, recordIdentifier: string, filepath: string) {
+    return await copyFile(filepath, path.join(localRepoPath, recordIdentifier, path.basename(filepath)))
+}
+
+export async function removeFileInRecord(localRepoPath: string, recordIdentifier: string, filepath: string) {
+    return await rm(path.join(localRepoPath, recordIdentifier, filepath))
+}
+
+export async function openFileInRecord(localRepoPath: string, recordIdentifier: string, filepath: string) {
+    return await shell.openPath(path.join(localRepoPath, recordIdentifier, filepath))
 }

@@ -1,10 +1,15 @@
 import { appStateStore } from "./state.svelte"
 
-export const identifierKey = "Identifier"
+export type RepositoryRecord = {
+    identifier: string,
+    metadata: RecordMetadata,
+    files: string[]
+}
 
-export type RepositoryRecordData = Record<string, string>
+export type RecordMetadata = Record<string, string>
+
 export enum MetadataValueType {
-    Options = "options", Date = "date", Number = "number", Text = "text"
+    Options = "options", Date = "date", Number = "number", Text = "text", File = "file"
 }
 
 export interface MetadataDescriptor {
@@ -20,38 +25,37 @@ export interface RepositoryConfiguration {
     exactKeys: boolean
 }
 
-export function recordDataIsEqual(record1: RepositoryRecordData, record2: RepositoryRecordData) {
+export function recordDataIsEqual(record1: RecordMetadata, record2: RecordMetadata) {
     if (record1 == record2) return true
     if (!record1) return false
     if (!record2) return false
     return JSON.stringify(Object.entries(record1).sort()) == JSON.stringify(Object.entries(record2).sort())
 }
 
-export async function loadRecords(localRepoPath: string): Promise<RepositoryRecordData[]> {
-    let records: RepositoryRecordData[] = []
+export async function loadRecords(localRepoPath: string): Promise<RepositoryRecord[]> {
+    let records: RepositoryRecord[] = []
     let recordNames: string[] = await window['repo'].getAllRepoRecords(localRepoPath)
     for (const recordName of recordNames) {
-        let recordMetadata: RepositoryRecordData = await window['repo'].getRecordMetadata(
-            localRepoPath,
-            recordName
-        )
-        recordMetadata[identifierKey] = recordName
-        records.push(recordMetadata)
+        records.push({
+            identifier: recordName,
+            metadata: await window['repo'].getRecordMetadata(localRepoPath, recordName),
+            files: await window['repo'].getFilesAssociatedWithRecord(localRepoPath, recordName)
+        })
     }
     return records
 }
 
-export function aggregateMetadataDescriptors(records: RepositoryRecordData[], repoConfig: RepositoryConfiguration): MetadataDescriptor[] {
+export function aggregateMetadataDescriptors(records: RepositoryRecord[], repoConfig: RepositoryConfiguration): MetadataDescriptor[] {
     let descriptors: MetadataDescriptor[] = $state([])
     let included: Set<string> = new Set()
     for (const definedDescriptor of repoConfig.defined) {
-        if (definedDescriptor.key == identifierKey) continue
+        if (definedDescriptor.key == 'Identifier') continue
         included.add(definedDescriptor.key)
         descriptors.push(definedDescriptor)
     }
     for (const record of records) {
-        for (const recordKey in record) {
-            if (recordKey == identifierKey) continue
+        for (const recordKey in record.metadata) {
+            if (recordKey == 'Identifier') continue // TODO we should remove this in the future
             if (included.has(recordKey)) continue
             included.add(recordKey)
             descriptors.push({
@@ -111,7 +115,7 @@ export async function deleteRecord(localRepoPath: string, recordIdentifier: stri
     return await window['repo'].deleteRecord(localRepoPath, recordIdentifier)
 }
 
-export async function saveRecord(localRepoPath: string, recordIdentifier: string, recordData: RepositoryRecordData) {
+export async function saveRecord(localRepoPath: string, recordIdentifier: string, recordData: RecordMetadata) {
     window['repo'].setRecord(localRepoPath, recordIdentifier, recordData)
 }
 
@@ -123,17 +127,17 @@ export async function setRepoConfig(localRepoPath: string, repoConfiguration: Re
     return window['repo'].setRepoConfiguration(localRepoPath, repoConfiguration)
 }
 
-export function validateRecords(records: RepositoryRecordData[], metadataDescriptors: MetadataDescriptor[]): Record<string, Record<string, string[]>> {
+export function validateRecords(records: RepositoryRecord[], metadataDescriptors: MetadataDescriptor[]): Record<string, Record<string, string[]>> {
     let issues: Record<string, Record<string, string[]>> = $state({})
     for (const record of records) {
-        issues[record[identifierKey]] = {}
-        let recordIssues = issues[record[identifierKey]]
+        issues[record.identifier] = {}
+        let recordIssues = issues[record.identifier]
         for (const { key, value: valueDesc, required } of metadataDescriptors) {
             recordIssues[key] = []
             const metadataIssues = recordIssues[key]
             if (key.trim() == '') metadataIssues.push("Metadata key cannot be empty.")
-            if (!record[key] && !required) continue
-            let recordStringValue: string = (record[key] || '').toString()
+            if (!record.metadata[key] && !required) continue
+            let recordStringValue: string = (record.metadata[key] || '').toString()
             switch (valueDesc.valueType) {
                 case MetadataValueType.Date:
                     if (!Date.parse(recordStringValue)) metadataIssues.push(`"${key}" must represent a date but could not be parsed as a date.`)
@@ -147,6 +151,9 @@ export function validateRecords(records: RepositoryRecordData[], metadataDescrip
                 case MetadataValueType.Text:
                     if (!recordStringValue || recordStringValue.trim() == '') metadataIssues.push(`"${key}" is required to not be blank.`)
                     break;
+                case MetadataValueType.File:
+                    if (record.files.length && !record.files.includes(recordStringValue)) metadataIssues.push(`"${key}" is not a known file name associated with record.`)
+                    if (!record.files.length && recordStringValue.length > 0) metadataIssues.push(`"${key}" is not a known file name associated with record.`)
             }
         }
     }
