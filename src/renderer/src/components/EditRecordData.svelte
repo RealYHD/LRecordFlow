@@ -26,12 +26,12 @@
   }: {
     metadataDescriptors: MetadataDescriptor[]
     liveRecords: RepositoryRecordData[]
-    liveIssues: Record<string, string[]>[]
+    liveIssues: Record<string, Record<string, string[]>>
     editRecordIndex: number
   } = $props()
   let recordData = $derived(liveRecords[editRecordIndex])
 
-  let recordIssues = $derived(liveIssues[editRecordIndex])
+  let recordIssues = $derived(liveIssues[liveRecords[editRecordIndex][identifierKey]])
   let createMetadata = $state({
     key: '',
     value: ''

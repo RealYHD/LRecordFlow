@@ -20,6 +20,13 @@ export interface RepositoryConfiguration {
     exactKeys: boolean
 }
 
+export function recordDataIsEqual(record1: RepositoryRecordData, record2: RepositoryRecordData) {
+    if (record1 == record2) return true
+    if (!record1) return false
+    if (!record2) return false
+    return JSON.stringify(Object.entries(record1).sort()) == JSON.stringify(Object.entries(record2).sort())
+}
+
 export async function loadRecords(localRepoPath: string): Promise<RepositoryRecordData[]> {
     let records: RepositoryRecordData[] = []
     let recordNames: string[] = await window['repo'].getAllRepoRecords(localRepoPath)
@@ -116,11 +123,11 @@ export async function setRepoConfig(localRepoPath: string, repoConfiguration: Re
     return window['repo'].setRepoConfiguration(localRepoPath, repoConfiguration)
 }
 
-export function validateRecords(records: RepositoryRecordData[], metadataDescriptors: MetadataDescriptor[]) {
-    let issues: Record<string, string[]>[] = $state([])
+export function validateRecords(records: RepositoryRecordData[], metadataDescriptors: MetadataDescriptor[]): Record<string, Record<string, string[]>> {
+    let issues: Record<string, Record<string, string[]>> = $state({})
     for (const record of records) {
-        issues.push({})
-        let recordIssues = issues[issues.length - 1]
+        issues[record[identifierKey]] = {}
+        let recordIssues = issues[record[identifierKey]]
         for (const { key, value: valueDesc, required } of metadataDescriptors) {
             recordIssues[key] = []
             const metadataIssues = recordIssues[key]
@@ -146,15 +153,15 @@ export function validateRecords(records: RepositoryRecordData[], metadataDescrip
     return issues
 }
 
-export function countIssues(recordIssues: Record<string, string[]>[]) {
-    const issueCount: number[] = $state([])
-    for (const issueRecord of recordIssues) {
+export function countIssues(recordIssues: Record<string, Record<string, string[]>>) {
+    const issueCount: Record<string, number> = $state({})
+    for (const recordIdentifier in recordIssues) {
         let total = 0
-        for (const key in issueRecord) {
-            const issues = issueRecord[key];
+        for (const key in recordIssues[recordIdentifier]) {
+            const issues = recordIssues[recordIdentifier][key];
             total += issues.length
         }
-        issueCount.push(total)
+        issueCount[recordIdentifier] = total
     }
     return issueCount
 }
@@ -194,4 +201,12 @@ export function validateMetadataKey(key: string, repoConfig: RepositoryConfigura
         issues.push(`"${key}" already exists.`)
     }
     return issues
+}
+
+export function openRepoRecordDirectory(localRepoPath: string, recordIdentifier: string) {
+    return window['repo'].openRepoRecordDirectory(localRepoPath, recordIdentifier)
+}
+
+export function openRepoDirectory(localRepoPath: string) {
+    return window['repo'].openRepoDirectory(localRepoPath)
 }

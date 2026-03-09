@@ -7,6 +7,8 @@
     getRepoConfig,
     identifierKey,
     loadRecords as loadRecordsFromStorage,
+    openRepoRecordDirectory,
+    recordDataIsEqual,
     saveRecord,
     setRepoConfig,
     validateRecordIdentifier,
@@ -37,39 +39,46 @@
     EditOutline,
     ExclamationCircleOutline,
     FloppyDiskOutline,
+    FolderArrowRightOutline,
     TrashBinOutline
   } from 'flowbite-svelte-icons'
   import { onMount } from 'svelte'
   import ConfigureRepository from '../components/ConfigureRepository.svelte'
+  import { SvelteSet } from 'svelte/reactivity'
 
   const localRepoPath = route.params.repository
 
-  let liveRecordData: RepositoryRecordData[] = $state([])
   let liveRepoConfiguration: RepositoryConfiguration = $state({
     defined: [],
     exactKeys: false
   })
+  let liveRecordData: RepositoryRecordData[] = $state([])
   let liveMetadataDescriptors: MetadataDescriptor[] = $derived(
     aggregateMetadataDescriptors(liveRecordData, liveRepoConfiguration)
   )
+  let liveRecordIdentifiers: Record<string, RepositoryRecordData> = $derived(
+    Object.fromEntries(liveRecordData.map((recordData) => [recordData[identifierKey], recordData]))
+  )
 
-  const saveDelay = 2
-  const saveTickInterval = 100
-  const persistedRecordData: Record<string, string> = $state({})
-  const modifiedRecords: [string, number][] = $derived(
+  const flushDelay = 2 * 1000
+  const flushTickInterval = 1000
+  const persistedRecordData: Record<string, RepositoryRecordData> = $state({})
+  const modifiedRecords: SvelteSet<string> = $derived(
     calcModifiedRecords(liveRecordData, persistedRecordData)
   )
-  const recordFlushState: Record<string, [number, string, boolean]> = $state({})
-  let unsavedRecordsCount: number = $derived(Object.keys(recordFlushState).length)
+  const recordFlushDelays: Record<
+    string,
+    { delay: number; flushing: boolean; snapshot: RepositoryRecordData }
+  > = $state({})
+  let flushIntervalTimerId = -1
 
   const displayedRows: RepositoryRecordData[] = $derived(liveRecordData) // TODO do something with this...
   const displayedMetadata: MetadataDescriptor[] = $derived(liveMetadataDescriptors)
-  const identifiers = $derived(liveRecordData.map((record) => record[identifierKey]))
 
   let liveRecordIssues = $derived(validateRecords(liveRecordData, liveMetadataDescriptors))
-  const liveRecordIssueCount: number[] = $derived(countIssues(liveRecordIssues))
+  const liveRecordIssueCount = $derived(countIssues(liveRecordIssues))
   let totalIssueCount: number = $derived(
-    liveRecordIssueCount.reduce((total, current) => total + current, 0)
+    Object.values(liveRecordIssueCount).reduce((total, current) => total + current, 0)
   )
   let editRecordDataOpen = $state(false)
   let editingLiveIndex: number = $state(0)
@@ -77,7 +86,7 @@
 
   let createRecordIdentifier = $state('')
   let createRecordIdentifierError = $derived(
-    validateRecordIdentifier(createRecordIdentifier, identifiers)
+    validateRecordIdentifier(createRecordIdentifier, Object.keys(liveRecordIdentifiers))
   )
   let createPending: boolean = $state(false)
   let createDisabled: boolean = $derived(createRecordIdentifierError.length > 0 || createPending)
@@ -106,77 +115,37 @@
 
   function calcModifiedRecords(
     liveRecords: RepositoryRecordData[],
-    flushedRecordsSnapshot: Record<string, string>
-  ): [string, number][] {
-    let changedRecordIdentifiers: [string, number][] = $state([])
-    for (const [index, liveRecord] of liveRecords.entries()) {
-      if (!Object.hasOwn(flushedRecordsSnapshot, liveRecord[identifierKey])) {
-        // Accounts for new records
-        console.log('new record detected')
-        changedRecordIdentifiers.push([liveRecord[identifierKey], index])
-      } else if (
-        flushedRecordsSnapshot[liveRecord[identifierKey]] !=
-        JSON.stringify(Object.entries($state.snapshot(liveRecord)).toSorted())
-      ) {
-        console.log(`${liveRecord[identifierKey]} is different.`)
-        changedRecordIdentifiers.push([liveRecord[identifierKey], index])
-      } else {
-        // technically nothing but good for logging
-        console.log(`${liveRecord[identifierKey]} has not changed.`)
-      }
-    }
-    console.log('Completed calculating modified records')
-    return changedRecordIdentifiers
-  }
-
-  function flushTick(): void {
-    for (const identifier in recordFlushState) {
-      if (!modifiedRecords.find(([modifiedIdentifier]) => modifiedIdentifier == identifier)) {
-        // If it's no longer in modified records, remove it from recordFlushState
-        // The only time it is no longer in modified records should be after the flush promise returns.
-        delete recordFlushState[identifier]
-      }
-    }
-    for (const [identifier, index] of modifiedRecords) {
-      let liveRecordSerialized = JSON.stringify(Object.entries(liveRecordData[index]).sort())
+    persistedRecordData: Record<string, RepositoryRecordData>
+  ): SvelteSet<string> {
+    let modifiedRecords: SvelteSet<string> = new SvelteSet()
+    for (const liveRecord of liveRecords) {
       if (
-        !Object.hasOwn(recordFlushState, identifier) ||
-        recordFlushState[identifier][1] != liveRecordSerialized
+        !recordDataIsEqual(
+          $state.snapshot(liveRecord),
+          $state.snapshot(persistedRecordData[liveRecord[identifierKey]])
+        )
       ) {
-        recordFlushState[identifier] = [saveDelay, liveRecordSerialized, false]
-      }
-      if (liveRecordIssueCount[index] > 0) continue
-      if (Object.hasOwn(recordFlushState, identifier)) {
-        recordFlushState[identifier][0] -=
-          recordFlushState[identifier][0] <= 0 ? 0 : saveTickInterval / 1000
-      }
-      if (recordFlushState[identifier][0] <= 0) {
-        recordFlushState[identifier][0] = 0
-        if (!recordFlushState[identifier][2]) {
-          recordFlushState[identifier][2] = true
-          flushRecord(liveRecordData[index])
-        }
+        modifiedRecords.add(liveRecord[identifierKey])
       }
     }
+    return modifiedRecords
   }
 
   function flushRecord(modifiedRecord: RepositoryRecordData): void {
     saveRecord(localRepoPath, modifiedRecord[identifierKey], $state.snapshot(modifiedRecord)).then(
       () => {
-        console.log(`${modifiedRecord[identifierKey]} has been flushed`)
-        modifiedRecords.splice(
-          modifiedRecords.findIndex(
-            ([modifiedIdentifier]) => modifiedIdentifier == modifiedRecord[identifierKey]
-          ),
-          1
-        )
-        Object.assign(persistedRecordData, {
-          [modifiedRecord[identifierKey]]: JSON.stringify(
-            Object.entries($state.snapshot(modifiedRecord)).toSorted()
-          )
-        })
+        delete recordFlushDelays[modifiedRecord[identifierKey]]
+        modifiedRecords.delete(modifiedRecord[identifierKey])
+        persistedRecordData[modifiedRecord[identifierKey]] = $state.snapshot(modifiedRecord)
       }
     )
+  }
+
+  function flushAllModifiedRecords(): void {
+    for (const modifiedRecordId of modifiedRecords) {
+      if (liveRecordIssueCount[modifiedRecordId]) continue
+      flushRecord($state.snapshot(liveRecordIdentifiers[modifiedRecordId]))
+    }
   }
 
   function loadRecords(): void {
@@ -184,9 +153,7 @@
     loadRecordsFromStorage(localRepoPath).then((loadedRecords) => {
       for (const loadedRecord of loadedRecords) {
         console.log('set persistence')
-        persistedRecordData[loadedRecord[identifierKey]] = JSON.stringify(
-          Object.entries($state.snapshot(loadedRecord)).toSorted()
-        )
+        persistedRecordData[loadedRecord[identifierKey]] = $state.snapshot(loadedRecord)
       }
       liveRecordData.push(...loadedRecords)
     })
@@ -199,16 +166,56 @@
       Object.assign(liveRepoConfiguration, loadedConfig)
     })
   }
+
+  function recordFlushTick(): void {
+    for (const modifiedRecordId of modifiedRecords) {
+      if (liveRecordIssueCount[modifiedRecordId]) continue
+      if (recordFlushDelays[modifiedRecordId]) {
+        if (
+          !recordDataIsEqual(
+            $state.snapshot(liveRecordIdentifiers[modifiedRecordId]),
+            recordFlushDelays[modifiedRecordId].snapshot
+          )
+        ) {
+          recordFlushDelays[modifiedRecordId].delay = flushDelay
+          recordFlushDelays[modifiedRecordId].snapshot = $state.snapshot(
+            liveRecordIdentifiers[modifiedRecordId]
+          )
+          recordFlushDelays[modifiedRecordId].flushing = false
+        } else if (
+          recordFlushDelays[modifiedRecordId].delay <= 0 &&
+          !recordFlushDelays[modifiedRecordId].flushing
+        ) {
+          recordFlushDelays[modifiedRecordId].flushing = true
+          flushRecord($state.snapshot(liveRecordIdentifiers[modifiedRecordId]))
+        } else {
+          recordFlushDelays[modifiedRecordId].delay -= flushTickInterval
+          if (recordFlushDelays[modifiedRecordId].delay <= 0)
+            recordFlushDelays[modifiedRecordId].delay = 0
+        }
+      } else {
+        recordFlushDelays[modifiedRecordId] = {
+          delay: flushDelay,
+          snapshot: $state.snapshot(liveRecordIdentifiers[modifiedRecordId]),
+          flushing: false
+        }
+      }
+    }
+  }
+
   onMount(() => {
     loadRecords()
     loadRepoConfiguration()
-    setInterval(flushTick, saveTickInterval)
+    flushIntervalTimerId = window.setInterval(recordFlushTick, flushTickInterval)
   })
 
-  $inspect(persistedRecordData).with(console.log)
-  $inspect(modifiedRecords).with(console.log)
-  $inspect(recordFlushState).with(console.log)
+  function onWindowUnload(): void {
+    flushAllModifiedRecords()
+    window.clearInterval(flushIntervalTimerId)
+  }
 </script>
+
+<svelte:window onbeforeunload={onWindowUnload} />
 
 <Drawer
   bind:open={editRepoConfigOpen}
@@ -256,7 +263,7 @@
         <TableHeadCell class="w-fit">
           {#if totalIssueCount}
             <ExclamationCircleOutline class="shrink-0" />
-          {:else if unsavedRecordsCount}
+          {:else if Object.keys(recordFlushDelays).length}
             <FloppyDiskOutline class="shrink-0" />
           {:else}
             <ClipboardCheckOutline class="shrink-0" />
@@ -274,24 +281,24 @@
           <TableBodyRow class="border-gray-200">
             <TableBodyCell>
               <!-- TODO fix the alignment issue here -->
-              {#if liveRecordIssueCount[rowIndex]}
+              {#if liveRecordIssueCount[row[identifierKey]]}
                 <ExclamationCircleOutline
                   color="red"
                   class="shrink-0"
                   id={`row-issues-indicator-${rowIndex}`}
                 />
                 <Popover triggeredBy={`#row-issues-indicator-${rowIndex}`}>
-                  {liveRecordIssueCount[rowIndex]} issue(s) found with metadata associated with this record.
-                  Updates will not be saved until fixed.
+                  {liveRecordIssueCount[row[identifierKey]]} issue(s) found with metadata associated with
+                  this record. Updates will not be saved until fixed.
                 </Popover>
-              {:else if recordFlushState[row[identifierKey]]}
+              {:else if recordFlushDelays[row[identifierKey]]}
                 <FloppyDiskOutline
                   color="blue"
                   class="shrink-0"
                   id={`row-saving-indicator-${rowIndex}`}
                 />
                 <Popover triggeredBy={`#row-saving-indicator-${rowIndex}`}>
-                  Saving record in {recordFlushState[row[identifierKey]][0]} seconds...
+                  Saving record in {recordFlushDelays[row[identifierKey]].delay} seconds...
                 </Popover>
               {:else}
                 <CheckCircleOutline class="shrink-0" id={`row-saved-indicator-${rowIndex}`} />
@@ -303,6 +310,9 @@
             <TableBodyCell>
               <ButtonGroup>
                 <Button onclick={() => editRecord(rowIndex)}><EditOutline /></Button>
+                <Button onclick={() => openRepoRecordDirectory(localRepoPath, row[identifierKey])}>
+                  <FolderArrowRightOutline />
+                </Button>
                 <Button onclick={() => removeRecord(rowIndex)}><TrashBinOutline /></Button>
               </ButtonGroup>
             </TableBodyCell>
@@ -311,7 +321,7 @@
             {#each displayedMetadata.filter(({ key }) => key != identifierKey) as { key }, colIndex (colIndex)}
               <TableBodyCell>
                 <div class="flex">
-                  {#if liveRecordIssues[rowIndex][key] && liveRecordIssues[rowIndex][key].length}
+                  {#if liveRecordIssues[row[identifierKey]][key] && liveRecordIssues[row[identifierKey]][key].length}
                     <ExclamationCircleOutline
                       color="red"
                       class="shrink-0"
@@ -319,7 +329,7 @@
                     />
                     <Popover triggeredBy={`#cell-issues-${rowIndex}-${colIndex}`}>
                       <ul>
-                        {#each liveRecordIssues[rowIndex][key] as issue (issue)}
+                        {#each liveRecordIssues[row[identifierKey]][key] as issue (issue)}
                           <li>{issue}</li>
                         {/each}
                       </ul>

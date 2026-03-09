@@ -1,6 +1,7 @@
 import simpleGit, { GitResponseError, MergeResult, TaskOptions } from "simple-git";
 import fs, { mkdir } from 'fs/promises';
 import path from "path";
+import { shell } from "electron";
 
 const recordMetadataFilename = "record.json"
 const repoConfigurationFilename = "configuration.json"
@@ -138,4 +139,12 @@ export async function getRepoConfiguration(localRepoPath: string) {
 export async function setRepoConfiguration(localRepoPath: string, repoConfiguration: object) {
     if (!await repoExists(localRepoPath)) return
     return await fs.writeFile(path.join(localRepoPath, repoConfigurationFilename), JSON.stringify(repoConfiguration))
+}
+
+export async function openRepoDirectory(localRepoPath: string) {
+    return await shell.openPath(localRepoPath)
+}
+
+export async function openRepoRecordDirectory(localRepoPath: string, recordIdentifier: string) {
+    return await shell.openPath(path.join(localRepoPath, recordIdentifier))
 }
