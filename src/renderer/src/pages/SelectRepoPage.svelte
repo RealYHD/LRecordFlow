@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button, ButtonGroup, Card } from 'flowbite-svelte'
+  import { Button, ButtonGroup, Card, Modal } from 'flowbite-svelte'
   import {
     DatabaseOutline,
     FileCloneOutline,
@@ -7,12 +7,46 @@
     TrashBinOutline
   } from 'flowbite-svelte-icons'
   import { appStateStore } from '../lib/state.svelte'
-  import GitCloneModal from '../components/GitCloneModal.svelte'
   import { navigate } from '../lib/router.svelte'
-  let gitCloneModalOpen = $state(false)
+  import CloneGitRepo from '../components/CloneGitRepo.svelte'
+  import { cloneGitRepository } from '../lib/repo.svelte'
+
+  let cloneGitRepoModalOpen = $state(false)
+  let cloneGitRepoValues = $state({
+    name: '',
+    remote: '',
+    local: ''
+  })
+  function onSubmit({ action }: { action: string }): boolean {
+    // TODO add validation here
+    if (action == 'clone') {
+      cloneGitRepository(
+        cloneGitRepoValues.name,
+        cloneGitRepoValues.remote,
+        cloneGitRepoValues.local
+      )
+    }
+    return true
+  }
 </script>
 
-<GitCloneModal bind:modalOpen={gitCloneModalOpen} />
+<Modal
+  title="Clone Repository"
+  class="w-80"
+  form
+  bind:open={cloneGitRepoModalOpen}
+  onaction={onSubmit}
+>
+  <CloneGitRepo
+    bind:nameInputValue={cloneGitRepoValues.name}
+    bind:remoteInputValue={cloneGitRepoValues.remote}
+    bind:localInputValue={cloneGitRepoValues.local}
+  />
+  {#snippet footer()}
+    <Button type="submit" class="btn btn-neutral mt-4" value="clone">Clone Repository</Button>
+  {/snippet}
+</Modal>
+
 <div class="p-4 overflow-y-auto">
   <h1 class="text-3xl mb-4">Repositories</h1>
   <div class="flex flex-wrap">
@@ -28,7 +62,7 @@
           </p>
         </div>
         <ButtonGroup class="w-fit">
-          <Button onclick={() => (gitCloneModalOpen = true)}>Clone</Button>
+          <Button onclick={() => (cloneGitRepoModalOpen = true)}>Clone</Button>
           <Button>Add</Button>
         </ButtonGroup>
       </div>
