@@ -29,7 +29,8 @@
     TableBodyCell,
     TableBodyRow,
     TableHead,
-    TableHeadCell
+    TableHeadCell,
+    Tooltip
   } from 'flowbite-svelte'
   import EditRecordData from '../components/EditRecordData.svelte'
   import {
@@ -262,11 +263,16 @@
       <TableHead class="normal-case">
         <TableHeadCell class="w-fit">
           {#if totalIssueCount}
-            <ExclamationCircleOutline class="shrink-0" />
+            <ExclamationCircleOutline class="shrink-0" color="red" />
+            <Popover
+              >Validation failed for {Object.keys(liveRecordIssueCount).length} (unsaved) records</Popover
+            >
           {:else if Object.keys(recordFlushDelays).length}
             <FloppyDiskOutline class="shrink-0" />
+            <Popover>{modifiedRecords.size} records still pending saving...</Popover>
           {:else}
             <ClipboardCheckOutline class="shrink-0" />
+            <Popover>Everything looks good and is saved!</Popover>
           {/if}
         </TableHeadCell>
         <TableHeadCell>Modify</TableHeadCell>
@@ -282,38 +288,31 @@
             <TableBodyCell>
               <!-- TODO fix the alignment issue here -->
               {#if liveRecordIssueCount[row[identifierKey]]}
-                <ExclamationCircleOutline
-                  color="red"
-                  class="shrink-0"
-                  id={`row-issues-indicator-${rowIndex}`}
-                />
-                <Popover triggeredBy={`#row-issues-indicator-${rowIndex}`}>
+                <ExclamationCircleOutline color="red" class="shrink-0" />
+                <Popover>
                   {liveRecordIssueCount[row[identifierKey]]} issue(s) found with metadata associated with
                   this record. Updates will not be saved until fixed.
                 </Popover>
               {:else if recordFlushDelays[row[identifierKey]]}
-                <FloppyDiskOutline
-                  color="blue"
-                  class="shrink-0"
-                  id={`row-saving-indicator-${rowIndex}`}
-                />
-                <Popover triggeredBy={`#row-saving-indicator-${rowIndex}`}>
+                <FloppyDiskOutline color="blue" class="shrink-0" />
+                <Popover>
                   Saving record in {recordFlushDelays[row[identifierKey]].delay} seconds...
                 </Popover>
               {:else}
                 <CheckCircleOutline class="shrink-0" id={`row-saved-indicator-${rowIndex}`} />
-                <Popover triggeredBy={`#row-saved-indicator-${rowIndex}`}>
-                  No issues found and record is saved on local storage.
-                </Popover>
+                <Popover>No issues found and record is saved on local storage.</Popover>
               {/if}
             </TableBodyCell>
             <TableBodyCell>
               <ButtonGroup>
                 <Button onclick={() => editRecord(rowIndex)}><EditOutline /></Button>
+                <Tooltip>Edit Record Metadata</Tooltip>
                 <Button onclick={() => openRepoRecordDirectory(localRepoPath, row[identifierKey])}>
                   <FolderArrowRightOutline />
                 </Button>
+                <Tooltip>Open Record Directory</Tooltip>
                 <Button onclick={() => removeRecord(rowIndex)}><TrashBinOutline /></Button>
+                <Tooltip>Delete Record</Tooltip>
               </ButtonGroup>
             </TableBodyCell>
             <TableBodyCell><Checkbox /></TableBodyCell>
@@ -322,12 +321,8 @@
               <TableBodyCell>
                 <div class="flex">
                   {#if liveRecordIssues[row[identifierKey]][key] && liveRecordIssues[row[identifierKey]][key].length}
-                    <ExclamationCircleOutline
-                      color="red"
-                      class="shrink-0"
-                      id={`cell-issues-${rowIndex}-${colIndex}`}
-                    />
-                    <Popover triggeredBy={`#cell-issues-${rowIndex}-${colIndex}`}>
+                    <ExclamationCircleOutline color="red" class="shrink-0" />
+                    <Popover>
                       <ul>
                         {#each liveRecordIssues[row[identifierKey]][key] as issue (issue)}
                           <li>{issue}</li>
