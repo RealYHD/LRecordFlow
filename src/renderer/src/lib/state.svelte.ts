@@ -16,14 +16,15 @@ export interface NotificationDescriptor {
 export interface AppState {
     knownRepos: Repository[]
     notifications: NotificationDescriptor[]
+    openedRepoPath: string | null
 }
 
 
 export const appStateStore: { state: AppState } = $state({
     state: {
-        preferredRepoView: 'Relational',
         knownRepos: [],
         notifications: [],
+        openedRepoPath: null
     }
 })
 

@@ -5,9 +5,13 @@ export async function selectSingleDirectory() {
   if (!canceled) {
     return filePaths[0]
   }
-  return
+  return null
 }
 
 export async function selectSingleFileOfType(fileFilters: FileFilter[]) {
-  return await dialog.showOpenDialog({ properties: ['openFile'] })
+  const {canceled, filePaths} = await dialog.showOpenDialog({ properties: ['openFile'], filters: fileFilters })
+  if (!canceled) {
+    return filePaths[0]
+  }
+  return null
 }

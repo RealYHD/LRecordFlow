@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { route } from '../lib/router.svelte'
   import {
     aggregateMetadataDescriptors,
     countIssues,
@@ -23,6 +22,7 @@
     ButtonGroup,
     Drawer,
     Input,
+    Modal,
     Popover,
     Table,
     TableBody,
@@ -41,14 +41,17 @@
     ExclamationCircleOutline,
     FloppyDiskOutline,
     FolderArrowRightOutline,
+    PlusOutline,
     RefreshOutline,
     TrashBinOutline
   } from 'flowbite-svelte-icons'
   import { onMount } from 'svelte'
   import ConfigureRepository from '../components/ConfigureRepository.svelte'
   import { SvelteSet } from 'svelte/reactivity'
+  import TabularImport from '../components/TabularImport.svelte'
+  import { appStateStore } from '../lib/state.svelte'
 
-  const localRepoPath = route.params.repository
+  const localRepoPath = appStateStore.state.openedRepoPath
 
   let liveRepoConfiguration: RepositoryConfiguration = $state({
     defined: [],
@@ -85,6 +88,8 @@
   let editRecordDataOpen = $state(false)
   let editingLiveIndex: number = $state(0)
   let editRepoConfigOpen = $state(false)
+
+  let importTabularOpen = $state(false)
 
   let createRecordIdentifier = $state('')
   let createRecordIdentifierError = $derived(
@@ -217,6 +222,18 @@
     }
   }
 
+  function addMetadataDescriptorDefinitions(metadataDescriptors: MetadataDescriptor[]): void {
+    for (const descriptor of metadataDescriptors) {
+      let matchingRepoConfigDesc = liveRepoConfiguration.defined.find(
+        (configDesc) => configDesc.key == descriptor.key
+      )
+      if (matchingRepoConfigDesc) {
+        Object.assign(matchingRepoConfigDesc, descriptor)
+      }
+      liveRepoConfiguration.defined.push(matchingRepoConfigDesc)
+    }
+  }
+
   onMount(() => {
     loadRecords()
     loadRepoConfiguration()
@@ -230,6 +247,13 @@
 </script>
 
 <svelte:window onbeforeunload={onWindowUnload} />
+
+<Modal bind:open={importTabularOpen}>
+  <TabularImport
+    definedMetadataDescriptors={liveRepoConfiguration.defined}
+    addMetadataDescriptorCallback={addMetadataDescriptorDefinitions}
+  />
+</Modal>
 
 <Drawer
   bind:open={editRepoConfigOpen}
@@ -252,25 +276,29 @@
 </Drawer>
 
 <div class="w-full h-full px-4 sm:px-1 pt-4">
-  <div class="mb-2 flex justify-center">
-    <span class="mx-2">
-      <ButtonGroup>
-        <Input type="text" placeholder="Identifier" bind:value={createRecordIdentifier} />
-        <Button onclick={() => addRecord()} disabled={createDisabled}>Add</Button>
-      </ButtonGroup>
-    </span>
-    <span class="mx-2">
-      <ButtonGroup>
-        <Button
-          onclick={() => {
-            editRepoConfigOpen = true
-          }}
-        >
-          <AdjustmentsVerticalOutline />
-          Settings
-        </Button>
-      </ButtonGroup>
-    </span>
+  <div class="mb-2 flex justify-center space-x-1">
+    <ButtonGroup>
+      <Input type="text" placeholder="Identifier" bind:value={createRecordIdentifier} />
+      <Button onclick={() => addRecord()} disabled={createDisabled}><PlusOutline /></Button>
+    </ButtonGroup>
+    <Tooltip>Add Record</Tooltip>
+    <Button
+      outline
+      color="secondary"
+      onclick={() => {
+        importTabularOpen = true
+      }}>Import</Button
+    >
+    <Button
+      outline
+      color="secondary"
+      onclick={() => {
+        editRepoConfigOpen = true
+      }}
+    >
+      <AdjustmentsVerticalOutline />
+      Settings
+    </Button>
   </div>
   <div>
     <Table hoverable={true} border={true} shadow>

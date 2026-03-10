@@ -17,6 +17,12 @@
     remote: '',
     local: ''
   })
+
+  function openRepo(localRepoPath: string): void {
+    appStateStore.state.openedRepoPath = localRepoPath
+    navigate('/repository')
+  }
+
   function onSubmit({ action }: { action: string }): boolean {
     // TODO add validation here
     if (action == 'clone') {
@@ -68,7 +74,10 @@
       </div>
     </Card>
     {#each appStateStore.state.knownRepos as repo (repo.local)}
-      <Card class="m-1 p-4 sm:p-6 md:p-8 w-90 min-w-90">
+      <Card
+        class="m-1 p-4 sm:p-6 md:p-8 w-90 min-w-90"
+        color={repo.local == appStateStore.state.openedRepoPath ? 'lime' : 'gray'}
+      >
         <DatabaseOutline class="shrink-0 h-8 w-8" />
         <h2 class="my-2 text-2xl tracking-tight text-gray-900 dark:text-white">
           {repo.name}
@@ -84,7 +93,7 @@
         <ButtonGroup class="w-fit">
           <Button
             onclick={() => {
-              navigate('/:repository/relational', { params: { repository: repo.local } })
+              openRepo(repo.local)
             }}>Open</Button
           >
           <Button><TrashBinOutline class="shrink-0" /></Button>

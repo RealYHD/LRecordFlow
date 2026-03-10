@@ -3,7 +3,7 @@ import { access, copyFile, cp, mkdir, readdir, readFile, rm, stat, writeFile } f
 import path from "path";
 import { shell } from "electron";
 import { createReadStream } from "fs";
-import csvParser from "csv-parser";
+import Papa from 'papaparse';
 
 const recordMetadataFilename = "record.json"
 const repoConfigurationFilename = "configuration.json"
@@ -169,21 +169,31 @@ export async function openFileInRecord(localRepoPath: string, recordIdentifier: 
     return await shell.openPath(path.join(localRepoPath, recordIdentifier, filepath))
 }
 
-export async function importRepoRecordsFromCSV(localRepoPath: string, csvPath: string, identifierCol: string, pathColumns: string[]) {
-    let identifiers: string[] = []
-    createReadStream(csvPath).pipe(csvParser())
-        .on('data', async (data) => {
-            await mkdir(path.join(localRepoPath, data[identifierCol]))
-            identifiers.push(data[identifierCol])
-            let recordMetadata = {}
-            Object.assign(recordMetadata, data)
-            delete recordMetadata[identifierCol]
-            for (const pathCol of pathColumns) {
-                if (!data[pathCol]) continue
-                recordMetadata[pathCol] = path.basename(data[pathCol])
-                await copyFile(data[pathCol], path.join(localRepoPath, data[identifierCol], recordMetadata[pathCol]))
+export async function importRepoRecordsFromCSV(localRepoPath: string, tabularPath: string, identifierCol: string, pathColumns: string[]) {
+    return new Promise<string[]>((resolve, reject) => {
+        let identifiers: string[] = []
+        Papa.parse<Record<string, string>>(tabularPath, {
+            header:true,
+            step: (results) => {
+                if (results.errors.length) reject(results.errors)
+                identifiers.push(results.data[identifierCol])
+                mkdir(path.join(localRepoPath, results.data[identifierCol])).then(() => {
+                    let recordMetadata = {}
+                    Object.assign(recordMetadata, results.data)
+                    delete recordMetadata[identifierCol]
+                    for (const pathCol of pathColumns) {
+                        recordMetadata[pathCol] = path.basename(results.data[pathCol])
+                        copyFile(results.data[pathCol], path.join(localRepoPath, results.data[identifierCol], recordMetadata[pathCol]))
+                        writeFile(path.join(localRepoPath, results.data[identifierCol], recordMetadataFilename), JSON.stringify(recordMetadata))
+                    }
+                })
+            },
+            complete: () => {
+                resolve(identifiers)
+            },
+            error: (error) => {
+                reject(error)
             }
-            await writeFile(path.join(localRepoPath, data[identifierCol], recordMetadataFilename), JSON.stringify(recordMetadata))
         })
-    return identifiers
+    })
 }

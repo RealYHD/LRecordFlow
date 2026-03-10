@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Button, ButtonGroup, Input, InputAddon, Label, Span } from 'flowbite-svelte'
-  import { openFolderSelector } from '../lib/dialog.svelte'
+  import { selectSingleDirectory } from '../lib/dialog.svelte'
 
   let {
     nameInputValue = $bindable(),
@@ -48,7 +48,7 @@
       <InputAddon>
         <Button
           class="btn join-item"
-          onclick={() => openFolderSelector().then((path) => (localInputValue = path))}
+          onclick={() => selectSingleDirectory().then((path) => (localInputValue = path))}
           >Select</Button
         >
       </InputAddon>

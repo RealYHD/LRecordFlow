@@ -15,13 +15,13 @@
 <Navbar>
   <NavBrand href="/">
     <span class="self-center text-xl font-semibold whitespace-nowrap dark:text-white"
-      >RepoRecords</span
+      >GitRecords</span
     >
   </NavBrand>
 
   <NavHamburger />
   <NavUl>
-    <NavLi href={p('/')}>Repositories</NavLi>
+    <NavLi href={p('/')}>Open</NavLi>
     <NavLi href={p('/notifications')}>Notifications</NavLi>
     <NavLi href={p('/help')}>Help</NavLi>
   </NavUl>
