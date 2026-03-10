@@ -5,18 +5,9 @@
     validateMetadataKey,
     type RepositoryConfiguration
   } from '../lib/repo.svelte'
-  import {
-    Accordion,
-    AccordionItem,
-    Button,
-    ButtonGroup,
-    Checkbox,
-    Input,
-    Label,
-    Select,
-    Span
-  } from 'flowbite-svelte'
-  import { PlusOutline, TrashBinOutline } from 'flowbite-svelte-icons'
+  import { Button, ButtonGroup, Input, Label, Span } from 'flowbite-svelte'
+  import { PlusOutline } from 'flowbite-svelte-icons'
+  import ConfigureMetadataDescriptors from './ConfigureMetadataDescriptors.svelte'
 
   const {
     repoConfig = $bindable()
@@ -26,8 +17,6 @@
 
   let metadataKeyToAdd: string = $state('')
   let metadataKeyIssues: string[] = $derived(validateMetadataKey(metadataKeyToAdd, repoConfig))
-
-  let metadataKeyOptionToAdd: string = $state('')
 
   onMount(() => {})
 </script>
@@ -61,65 +50,10 @@
           </ButtonGroup>
         </div>
         {#if repoConfig.defined.length}
-          <Accordion flush>
-            {#each repoConfig.defined as metadataKeyValueDescriptor, index (index)}
-              <AccordionItem>
-                {#snippet header()}Configure "{metadataKeyValueDescriptor.key}"{/snippet}
-                <div class="space-y-2">
-                  <div>
-                    <Label class="mb-2">Set value type</Label>
-                    <Select
-                      class="mt-2"
-                      items={Object.entries(MetadataValueType).map(([name, value]) => ({
-                        value,
-                        name
-                      }))}
-                      bind:value={repoConfig.defined[index].value.valueType}
-                    />
-                  </div>
-                  <div>
-                    <Checkbox bind:checked={repoConfig.defined[index].required}>Required</Checkbox>
-                  </div>
-                  {#if repoConfig.defined[index].value.valueType == MetadataValueType.Options}
-                    <div class="mt-2 space-y-2">
-                      <Label>Add option</Label>
-                      <ButtonGroup>
-                        <Input id="" bind:value={metadataKeyOptionToAdd} />
-                        <Button
-                          onclick={() => {
-                            metadataKeyOptionToAdd = ''
-                            repoConfig.defined[index].value.options.push(metadataKeyOptionToAdd)
-                          }}
-                          disabled={repoConfig.defined[index].value.options.includes(
-                            metadataKeyOptionToAdd
-                          )}><PlusOutline /></Button
-                        >
-                      </ButtonGroup>
-                      {#each { length: repoConfig.defined[index].value.options.length }, optionIndex}
-                        <ButtonGroup>
-                          <Input
-                            bind:value={repoConfig.defined[index].value.options[optionIndex]}
-                          />
-                          <Button
-                            onclick={() =>
-                              repoConfig.defined[index].value.options.splice(optionIndex, 1)}
-                            ><TrashBinOutline /></Button
-                          >
-                        </ButtonGroup>
-                      {/each}
-                    </div>
-                  {/if}
-                </div>
-              </AccordionItem>
-            {/each}
-          </Accordion>
+          <ConfigureMetadataDescriptors bind:metadataDescriptors={repoConfig.defined} />
         {:else}
           <Span class="mx-auto py-5 px-3">No metadata associated with this record yet!</Span>
         {/if}
-        <!-- TODO implement adding column configurations -->
-      </div>
-      <div>
-        <!-- TODO implement adding configuring the columns -->
       </div>
     </div>
   </div>

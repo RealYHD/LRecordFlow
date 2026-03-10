@@ -1,7 +1,9 @@
 import simpleGit, { GitResponseError, MergeResult, TaskOptions } from "simple-git";
-import fs, { copyFile, mkdir, rm } from 'fs/promises';
+import { access, copyFile, cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'fs/promises';
 import path from "path";
 import { shell } from "electron";
+import { createReadStream } from "fs";
+import csvParser from "csv-parser";
 
 const recordMetadataFilename = "record.json"
 const repoConfigurationFilename = "configuration.json"
@@ -62,37 +64,37 @@ export async function save(localRepoPath: string, modificationNotes: string) {
 export async function recordExists(localRepoPath: string, recordIdentifier: string): Promise<boolean> {
     let recordDirectory = getRecordPath(localRepoPath, recordIdentifier)
     try {
-        await fs.access(recordDirectory)
+        await access(recordDirectory)
     } catch (error) {
         return false
     }
-    return (await (fs.stat(recordDirectory))).isDirectory()
+    return (await (stat(recordDirectory))).isDirectory()
 }
 
 export async function recordHasMetadata(localRepoPath: string, recordIdentifier: string): Promise<boolean> {
     let metadataPath = getRecordMetadataPath(localRepoPath, recordIdentifier)
     try {
-        await fs.access(metadataPath)
+        await access(metadataPath)
     } catch (error) {
         return false
     }
-    return (await (fs.stat(metadataPath))).isFile()
+    return (await (stat(metadataPath))).isFile()
 }
 
 export async function createRecord(localRepoPath: string, recordIdentifier: string) {
     if (await recordExists(localRepoPath, recordIdentifier)) return
-    return await fs.mkdir(getRecordPath(localRepoPath, recordIdentifier))
+    return await mkdir(getRecordPath(localRepoPath, recordIdentifier))
 }
 
 export async function deleteRecord(localRepoPath: string, recordIdentifier: string) {
     if (!await recordExists(localRepoPath, recordIdentifier)) return
-    return await fs.rm(getRecordPath(localRepoPath, recordIdentifier), { recursive: true, force: true })
+    return await rm(getRecordPath(localRepoPath, recordIdentifier), { recursive: true, force: true })
 }
 
 export async function getRecordMetadata(localRepoPath: string, recordIdentifier: string): Promise<Record<string, string>> {
     if (!(await recordExists(localRepoPath, recordIdentifier)) || !(await recordHasMetadata(localRepoPath, recordIdentifier))) return {}
     if (await recordHasMetadata(localRepoPath, recordIdentifier)) {
-        return JSON.parse(await fs.readFile(getRecordMetadataPath(localRepoPath, recordIdentifier), 'utf-8'))
+        return JSON.parse(await readFile(getRecordMetadataPath(localRepoPath, recordIdentifier), 'utf-8'))
     }
     return {}
 }
@@ -101,22 +103,22 @@ export async function setRecord(localRepoPath: string, recordIdentifier: string,
     if (!localRepoPath.trim().length) return
     if (!recordIdentifier.trim().length) return
     await mkdir(path.join(localRepoPath, recordIdentifier), { recursive: true })
-    return await fs.writeFile(getRecordMetadataPath(localRepoPath, recordIdentifier), JSON.stringify(recordData))
+    return await writeFile(getRecordMetadataPath(localRepoPath, recordIdentifier), JSON.stringify(recordData))
 }
 
 export async function repoExists(localRepoPath: string) {
     try {
-        await fs.access(localRepoPath)
+        await access(localRepoPath)
     } catch (error) {
         return false
     }
-    return (await fs.stat(localRepoPath)).isDirectory() && (await simpleGit({ baseDir: localRepoPath }).checkIsRepo())
+    return (await stat(localRepoPath)).isDirectory() && (await simpleGit({ baseDir: localRepoPath }).checkIsRepo())
 }
 
 export async function getAllRepoRecords(localRepoPath: string) {
     // TODO Perhaps in the future make this recursive for "nested records"?
     if (!await repoExists(localRepoPath)) return [];
-    return (await fs.readdir(localRepoPath, { withFileTypes: true })).filter(entry => {
+    return (await readdir(localRepoPath, { withFileTypes: true })).filter(entry => {
         return entry.isDirectory() && !(ignoredRecordFolders.includes(entry.name))
     }).map((dir) => dir.name)
 }
@@ -124,7 +126,7 @@ export async function getAllRepoRecords(localRepoPath: string) {
 export async function repoConfigurationExists(localRepoPath: string) {
     if (!await repoExists(localRepoPath)) return [];
     try {
-        await fs.access(path.join(localRepoPath, repoConfigurationFilename))
+        await access(path.join(localRepoPath, repoConfigurationFilename))
     } catch (error) {
         return false
     }
@@ -133,12 +135,12 @@ export async function repoConfigurationExists(localRepoPath: string) {
 
 export async function getRepoConfiguration(localRepoPath: string) {
     if (!await repoExists(localRepoPath) || !await repoConfigurationExists(localRepoPath)) return {};
-    return JSON.parse(await fs.readFile(path.join(localRepoPath, repoConfigurationFilename), 'utf-8'))
+    return JSON.parse(await readFile(path.join(localRepoPath, repoConfigurationFilename), 'utf-8'))
 }
 
 export async function setRepoConfiguration(localRepoPath: string, repoConfiguration: object) {
     if (!await repoExists(localRepoPath)) return
-    return await fs.writeFile(path.join(localRepoPath, repoConfigurationFilename), JSON.stringify(repoConfiguration))
+    return await writeFile(path.join(localRepoPath, repoConfigurationFilename), JSON.stringify(repoConfiguration))
 }
 
 export async function openRepoDirectory(localRepoPath: string) {
@@ -150,7 +152,7 @@ export async function openRepoRecordDirectory(localRepoPath: string, recordIdent
 }
 
 export async function getFilesAssociatedWithRecord(localRepoPath: string, recordIdentifier: string) {
-    return (await fs.readdir(path.join(localRepoPath, recordIdentifier), { recursive: false, withFileTypes: true }))
+    return (await readdir(path.join(localRepoPath, recordIdentifier), { recursive: false, withFileTypes: true }))
         .filter((entry) => entry.isFile() && entry.name != recordMetadataFilename)
         .map((entry) => entry.name)
 }
@@ -165,4 +167,23 @@ export async function removeFileInRecord(localRepoPath: string, recordIdentifier
 
 export async function openFileInRecord(localRepoPath: string, recordIdentifier: string, filepath: string) {
     return await shell.openPath(path.join(localRepoPath, recordIdentifier, filepath))
+}
+
+export async function importRepoRecordsFromCSV(localRepoPath: string, csvPath: string, identifierCol: string, pathColumns: string[]) {
+    let identifiers: string[] = []
+    createReadStream(csvPath).pipe(csvParser())
+        .on('data', async (data) => {
+            await mkdir(path.join(localRepoPath, data[identifierCol]))
+            identifiers.push(data[identifierCol])
+            let recordMetadata = {}
+            Object.assign(recordMetadata, data)
+            delete recordMetadata[identifierCol]
+            for (const pathCol of pathColumns) {
+                if (!data[pathCol]) continue
+                recordMetadata[pathCol] = path.basename(data[pathCol])
+                await copyFile(data[pathCol], path.join(localRepoPath, data[identifierCol], recordMetadata[pathCol]))
+            }
+            await writeFile(path.join(localRepoPath, data[identifierCol], recordMetadataFilename), JSON.stringify(recordMetadata))
+        })
+    return identifiers
 }

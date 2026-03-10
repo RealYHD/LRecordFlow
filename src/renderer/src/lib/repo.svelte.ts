@@ -1,219 +1,247 @@
-import { appStateStore } from "./state.svelte"
+import { appStateStore } from './state.svelte'
 
 export type RepositoryRecord = {
-    identifier: string,
-    metadata: RecordMetadata,
-    files: string[]
+  identifier: string
+  metadata: RecordMetadata
+  files: string[]
 }
 
 export type RecordMetadata = Record<string, string>
 
 export enum MetadataValueType {
-    Options = "options", Date = "date", Number = "number", Text = "text", File = "file"
+  Options = 'options',
+  Date = 'date',
+  Number = 'number',
+  Text = 'text',
+  File = 'file'
 }
 
 export interface MetadataDescriptor {
-    key: string
-    value: {
-        valueType: MetadataValueType
-        options: string[]
-    }
-    required: boolean
+  key: string
+  value: {
+    valueType: MetadataValueType
+    options: string[]
+  }
+  required: boolean
 }
 export interface RepositoryConfiguration {
-    defined: MetadataDescriptor[]
-    exactKeys: boolean
+  defined: MetadataDescriptor[]
+  exactKeys: boolean
 }
 
 export function recordDataIsEqual(record1: RecordMetadata, record2: RecordMetadata) {
-    if (record1 == record2) return true
-    if (!record1) return false
-    if (!record2) return false
-    return JSON.stringify(Object.entries(record1).sort()) == JSON.stringify(Object.entries(record2).sort())
+  if (record1 == record2) return true
+  if (!record1) return false
+  if (!record2) return false
+  return (
+    JSON.stringify(Object.entries(record1).sort()) == JSON.stringify(Object.entries(record2).sort())
+  )
 }
 
 export async function loadRecords(localRepoPath: string): Promise<RepositoryRecord[]> {
-    let records: RepositoryRecord[] = []
-    let recordNames: string[] = await window['repo'].getAllRepoRecords(localRepoPath)
-    for (const recordName of recordNames) {
-        records.push({
-            identifier: recordName,
-            metadata: await window['repo'].getRecordMetadata(localRepoPath, recordName),
-            files: await window['repo'].getFilesAssociatedWithRecord(localRepoPath, recordName)
-        })
-    }
-    return records
+  let records: RepositoryRecord[] = []
+  let recordNames: string[] = await window['repo'].getAllRepoRecords(localRepoPath)
+  for (const identifier of recordNames) {
+    records.push(await loadRecord(localRepoPath, identifier))
+  }
+  return records
 }
 
-export function aggregateMetadataDescriptors(records: RepositoryRecord[], repoConfig: RepositoryConfiguration): MetadataDescriptor[] {
-    let descriptors: MetadataDescriptor[] = $state([])
-    let included: Set<string> = new Set()
-    for (const definedDescriptor of repoConfig.defined) {
-        if (definedDescriptor.key == 'Identifier') continue
-        included.add(definedDescriptor.key)
-        descriptors.push(definedDescriptor)
-    }
-    for (const record of records) {
-        for (const recordKey in record.metadata) {
-            if (recordKey == 'Identifier') continue // TODO we should remove this in the future
-            if (included.has(recordKey)) continue
-            included.add(recordKey)
-            descriptors.push({
-                key: recordKey,
-                required: false,
-                value: {
-                    options: [],
-                    valueType: MetadataValueType.Text
-                }
-            })
+export async function loadRecord(localRepoPath: string, identifier: string) {
+  return {
+    identifier: identifier,
+    metadata: await window['repo'].getRecordMetadata(localRepoPath, identifier),
+    files: await window['repo'].getFilesAssociatedWithRecord(localRepoPath, identifier)
+  }
+}
+
+export function aggregateMetadataDescriptors(
+  records: RepositoryRecord[],
+  repoConfig: RepositoryConfiguration
+): MetadataDescriptor[] {
+  let descriptors: MetadataDescriptor[] = $state([])
+  let included: Set<string> = new Set()
+  for (const definedDescriptor of repoConfig.defined) {
+    if (definedDescriptor.key == 'Identifier') continue
+    included.add(definedDescriptor.key)
+    descriptors.push(definedDescriptor)
+  }
+  for (const record of records) {
+    for (const recordKey in record.metadata) {
+      if (recordKey == 'Identifier') continue // TODO we should remove this in the future
+      if (included.has(recordKey)) continue
+      included.add(recordKey)
+      descriptors.push({
+        key: recordKey,
+        required: false,
+        value: {
+          options: [],
+          valueType: MetadataValueType.Text
         }
+      })
     }
-    return descriptors
+  }
+  return descriptors
 }
 
 export function cloneGitRepository(name: string, remote: string, local: string): void {
-    appStateStore.state.notifications.push({
+  appStateStore.state.notifications.push({
+    date: new Date(),
+    message: `Began cloning repository ("${name}") from "${remote}" to "${local}"`,
+    status: 'Information',
+    title: `Cloning "${name}"`
+  })
+  appStateStore.state.knownRepos.push({
+    name: name,
+    remote: remote,
+    local: local,
+    lastAccessed: new Date(),
+    status: 'Not Ready'
+  })
+  window['repo']
+    .cloneGitRepository(remote, local, name)
+    .then((clonePath: string) => {
+      appStateStore.state.notifications.push({
         date: new Date(),
-        message: `Began cloning repository ("${name}") from "${remote}" to "${local}"`,
+        message: `Completed cloning repository ("${name}") from "${remote}" to "${local}"`,
         status: 'Information',
-        title: `Cloning "${name}"`
+        title: `Completed cloning "${name}"`
+      })
+      let repo = appStateStore.state.knownRepos.find((repo) => repo.local == local)
+      repo.status = 'Ready'
+      repo.local = clonePath
     })
-    appStateStore.state.knownRepos.push({
-        name: name,
-        remote: remote,
-        local: local,
-        lastAccessed: new Date(),
-        status: 'Not Ready'
+    .catch((err) => {
+      appStateStore.state.notifications.push({
+        date: new Date(),
+        message:
+          `Failed to clone repository "${name}" from "${remote}" to "${local}" due to following error\n` +
+          err.message,
+        status: 'Alert',
+        title: `Failed to clone repository "${name}"`
+      })
+      appStateStore.state.knownRepos.find((repo) => repo.local == local).status = 'Not Ready'
     })
-    window['repo']
-        .cloneGitRepository(remote, local, name)
-        .then((clonePath: string) => {
-            appStateStore.state.notifications.push({
-                date: new Date(),
-                message: `Completed cloning repository ("${name}") from "${remote}" to "${local}"`,
-                status: 'Information',
-                title: `Completed cloning "${name}"`
-            })
-            let repo = appStateStore.state.knownRepos.find((repo) => repo.local == local)
-            repo.status = 'Ready'
-            repo.local = clonePath
-        })
-        .catch((err) => {
-            appStateStore.state.notifications.push({
-                date: new Date(),
-                message:
-                    `Failed to clone repository "${name}" from "${remote}" to "${local}" due to following error\n` +
-                    err.message,
-                status: 'Alert',
-                title: `Failed to clone repository "${name}"`
-            })
-            appStateStore.state.knownRepos.find((repo) => repo.local == local).status = 'Not Ready'
-        })
 }
 
 export async function deleteRecord(localRepoPath: string, recordIdentifier: string) {
-    return await window['repo'].deleteRecord(localRepoPath, recordIdentifier)
+  return await window['repo'].deleteRecord(localRepoPath, recordIdentifier)
 }
 
-export async function saveRecord(localRepoPath: string, recordIdentifier: string, recordData: RecordMetadata) {
-    window['repo'].setRecord(localRepoPath, recordIdentifier, recordData)
+export async function saveRecord(
+  localRepoPath: string,
+  recordIdentifier: string,
+  recordData: RecordMetadata
+) {
+  window['repo'].setRecord(localRepoPath, recordIdentifier, recordData)
 }
 
 export async function getRepoConfig(localRepoPath: string) {
-    return window['repo'].getRepoConfiguration(localRepoPath)
+  return window['repo'].getRepoConfiguration(localRepoPath)
 }
 
-export async function setRepoConfig(localRepoPath: string, repoConfiguration: RepositoryConfiguration) {
-    return window['repo'].setRepoConfiguration(localRepoPath, repoConfiguration)
+export async function setRepoConfig(
+  localRepoPath: string,
+  repoConfiguration: RepositoryConfiguration
+) {
+  return window['repo'].setRepoConfiguration(localRepoPath, repoConfiguration)
 }
 
-export function validateRecords(records: RepositoryRecord[], metadataDescriptors: MetadataDescriptor[]): Record<string, Record<string, string[]>> {
-    let issues: Record<string, Record<string, string[]>> = $state({})
-    for (const record of records) {
-        issues[record.identifier] = {}
-        let recordIssues = issues[record.identifier]
-        for (const { key, value: valueDesc, required } of metadataDescriptors) {
-            recordIssues[key] = []
-            const metadataIssues = recordIssues[key]
-            if (key.trim() == '') metadataIssues.push("Metadata key cannot be empty.")
-            if (!record.metadata[key] && !required) continue
-            let recordStringValue: string = (record.metadata[key] || '').toString()
-            switch (valueDesc.valueType) {
-                case MetadataValueType.Date:
-                    if (!Date.parse(recordStringValue)) metadataIssues.push(`"${key}" must represent a date but could not be parsed as a date.`)
-                    break;
-                case MetadataValueType.Number:
-                    if (!Number.parseFloat(recordStringValue)) metadataIssues.push(`"${key}" must be a number but could not be parsed as a number.`)
-                    break;
-                case MetadataValueType.Options:
-                    if (!valueDesc.options.includes(recordStringValue)) metadataIssues.push(`"${key}" must be one of ${valueDesc.options.join(', ')}.`)
-                    break;
-                case MetadataValueType.Text:
-                    if (!recordStringValue || recordStringValue.trim() == '') metadataIssues.push(`"${key}" is required to not be blank.`)
-                    break;
-                case MetadataValueType.File:
-                    if (record.files.length && !record.files.includes(recordStringValue)) metadataIssues.push(`"${key}" is not a known file name associated with record.`)
-                    if (!record.files.length && recordStringValue.length > 0) metadataIssues.push(`"${key}" is not a known file name associated with record.`)
-            }
-        }
+export function validateRecords(
+  records: RepositoryRecord[],
+  metadataDescriptors: MetadataDescriptor[]
+): Record<string, Record<string, string[]>> {
+  let issues: Record<string, Record<string, string[]>> = $state({})
+  for (const record of records) {
+    issues[record.identifier] = {}
+    let recordIssues = issues[record.identifier]
+    for (const { key, value: valueDesc, required } of metadataDescriptors) {
+      recordIssues[key] = []
+      const metadataIssues = recordIssues[key]
+      if (key.trim() == '') metadataIssues.push('Metadata key cannot be empty.')
+      if (!record.metadata[key] && !required) continue
+      let recordStringValue: string = (record.metadata[key] || '').toString()
+      switch (valueDesc.valueType) {
+        case MetadataValueType.Date:
+          if (!Date.parse(recordStringValue))
+            metadataIssues.push(`"${key}" must represent a date but could not be parsed as a date.`)
+          break
+        case MetadataValueType.Number:
+          if (!Number.parseFloat(recordStringValue))
+            metadataIssues.push(`"${key}" must be a number but could not be parsed as a number.`)
+          break
+        case MetadataValueType.Options:
+          if (!valueDesc.options.includes(recordStringValue))
+            metadataIssues.push(`"${key}" must be one of ${valueDesc.options.join(', ')}.`)
+          break
+        case MetadataValueType.Text:
+          if (!recordStringValue || recordStringValue.trim() == '')
+            metadataIssues.push(`"${key}" is required to not be blank.`)
+          break
+        case MetadataValueType.File:
+          if (record.files.length && !record.files.includes(recordStringValue))
+            metadataIssues.push(`"${key}" is not a known file name associated with record.`)
+          if (!record.files.length && recordStringValue.length > 0)
+            metadataIssues.push(`"${key}" is not a known file name associated with record.`)
+      }
     }
-    return issues
+  }
+  return issues
 }
 
 export function countIssues(recordIssues: Record<string, Record<string, string[]>>) {
-    const issueCount: Record<string, number> = $state({})
-    for (const recordIdentifier in recordIssues) {
-        let total = 0
-        for (const key in recordIssues[recordIdentifier]) {
-            const issues = recordIssues[recordIdentifier][key];
-            total += issues.length
-        }
-        issueCount[recordIdentifier] = total
+  const issueCount: Record<string, number> = $state({})
+  for (const recordIdentifier in recordIssues) {
+    let total = 0
+    for (const key in recordIssues[recordIdentifier]) {
+      const issues = recordIssues[recordIdentifier][key]
+      total += issues.length
     }
-    return issueCount
+    issueCount[recordIdentifier] = total
+  }
+  return issueCount
 }
 
 export function validateRecordIdentifier(identifier: string, allIdentifiers: string[]) {
-    // TODO validate that it is a valid path
-    if (identifier.trim().length <= 0) {
-        return "Identifier cannot be blank"
-    }
-    if (identifier.trim().length != identifier.length) return "Identifier must not have leading or lagging spaces"
-    if (allIdentifiers.includes(identifier)) {
-        return "Identifier is already in use"
-    }
-    return ''
+  // TODO validate that it is a valid path
+  if (identifier.trim().length <= 0) {
+    return 'Identifier cannot be blank'
+  }
+  if (identifier.trim().length != identifier.length)
+    return 'Identifier must not have leading or lagging spaces'
+  if (allIdentifiers.includes(identifier)) {
+    return 'Identifier is already in use'
+  }
+  return ''
 }
 
-
-
 export function validateRepoConfig(repoConfig: RepositoryConfiguration): Record<string, string[]> {
-    let issues: Record<string, string[]> = $state({})
-    for (const { key } of repoConfig.defined) {
-        issues[key] = []
-        const metadataIssues = issues[key];
-        if (key.trim().length == 0) {
-            metadataIssues.push("Metadata key cannot be empty.")
-        }
+  let issues: Record<string, string[]> = $state({})
+  for (const { key } of repoConfig.defined) {
+    issues[key] = []
+    const metadataIssues = issues[key]
+    if (key.trim().length == 0) {
+      metadataIssues.push('Metadata key cannot be empty.')
     }
-    return issues
+  }
+  return issues
 }
 
 export function validateMetadataKey(key: string, repoConfig: RepositoryConfiguration): string[] {
-    const issues: string[] = $state([])
-    if (key.trim().length == 0) {
-        issues.push("Key cannot be empty.")
-    }
-    if (repoConfig.defined.find((value) => value.key == key)) {
-        issues.push(`"${key}" already exists.`)
-    }
-    return issues
+  const issues: string[] = $state([])
+  if (key.trim().length == 0) {
+    issues.push('Key cannot be empty.')
+  }
+  if (repoConfig.defined.find((value) => value.key == key)) {
+    issues.push(`"${key}" already exists.`)
+  }
+  return issues
 }
 
 export function openRepoRecordDirectory(localRepoPath: string, recordIdentifier: string) {
-    return window['repo'].openRepoRecordDirectory(localRepoPath, recordIdentifier)
+  return window['repo'].openRepoRecordDirectory(localRepoPath, recordIdentifier)
 }
 
 export function openRepoDirectory(localRepoPath: string) {
-    return window['repo'].openRepoDirectory(localRepoPath)
+  return window['repo'].openRepoDirectory(localRepoPath)
 }

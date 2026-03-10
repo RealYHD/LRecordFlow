@@ -11,7 +11,6 @@ if (process.contextIsolated) {
     contextBridge.exposeInMainWorld('electron', electronAPI)
     ipcRenderer.invoke("getRegisteredIPCHandles").then((ipcHandles) => {
       for (const [domain, handleKeys] of Object.entries(ipcHandles)) {
-        console.log(handleKeys)
         contextBridge.exposeInMainWorld(
           domain,
           Object.fromEntries((handleKeys as [string, string][]).map(([key, handleKey]) => {

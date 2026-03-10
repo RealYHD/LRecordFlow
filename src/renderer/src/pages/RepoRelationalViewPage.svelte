@@ -15,12 +15,12 @@
     type MetadataDescriptor,
     type RepositoryConfiguration,
     type RecordMetadata,
-    type RepositoryRecord
+    type RepositoryRecord,
+    loadRecord
   } from '../lib/repo.svelte'
   import {
     Button,
     ButtonGroup,
-    Checkbox,
     Drawer,
     Input,
     Popover,
@@ -41,6 +41,7 @@
     ExclamationCircleOutline,
     FloppyDiskOutline,
     FolderArrowRightOutline,
+    RefreshOutline,
     TrashBinOutline
   } from 'flowbite-svelte-icons'
   import { onMount } from 'svelte'
@@ -166,6 +167,12 @@
     })
   }
 
+  function reloadRecord(identifier: string): void {
+    loadRecord(localRepoPath, identifier).then((record) => {
+      Object.assign(liveRepoRecordsById[identifier], record)
+    })
+  }
+
   function loadRepoConfiguration(): void {
     liveRepoConfiguration.defined = []
     liveRepoConfiguration.exactKeys = false
@@ -240,6 +247,7 @@
     bind:liveRecords={liveRepoRecords}
     bind:liveIssues={liveRecordIssues}
     bind:editRecordIndex={editingLiveIndex}
+    refreshRecordFn={reloadRecord}
   />
 </Drawer>
 
@@ -282,7 +290,6 @@
           {/if}
         </TableHeadCell>
         <TableHeadCell>Modify</TableHeadCell>
-        <TableHeadCell class="w-fit"><Checkbox /></TableHeadCell>
         <TableHeadCell>Identifier</TableHeadCell>
         {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key } (key)}
           <TableHeadCell>{key}</TableHeadCell>
@@ -300,28 +307,55 @@
                   record. Updates will not be saved until fixed.
                 </Popover>
               {:else if recordFlushDelays[identifier]}
-                <FloppyDiskOutline color="blue" class="shrink-0" />
+                <FloppyDiskOutline color="primary" class="shrink-0" />
                 <Popover>
                   Saving record in {recordFlushDelays[identifier].delay} seconds...
                 </Popover>
               {:else}
-                <CheckCircleOutline class="shrink-0" />
+                <CheckCircleOutline class="shrink-0" color="green" />
                 <Popover>No issues found and record is saved on local storage.</Popover>
               {/if}
             </TableBodyCell>
             <TableBodyCell>
-              <ButtonGroup class="w-fit">
-                <Button onclick={() => editRecord(rowIndex)}><EditOutline /></Button>
-                <Tooltip>Edit Record Metadata</Tooltip>
-                <Button onclick={() => openRepoRecordDirectory(localRepoPath, identifier)}>
-                  <FolderArrowRightOutline />
-                </Button>
-                <Tooltip>Open Record Directory</Tooltip>
-                <Button onclick={() => removeRecord(rowIndex)}><TrashBinOutline /></Button>
-                <Tooltip>Delete Record</Tooltip>
-              </ButtonGroup>
+              <Button
+                onclick={() => editRecord(rowIndex)}
+                size="xs"
+                class="p-2!"
+                pill
+                outline
+                color="primary"><EditOutline size="xs" /></Button
+              >
+              <Tooltip>Edit Record Metadata</Tooltip>
+              <Button
+                onclick={() => reloadRecord(identifier)}
+                size="xs"
+                pill
+                outline
+                color="secondary"
+                class="p-2!"><RefreshOutline size="xs" /></Button
+              >
+              <Tooltip>Reload from Disk</Tooltip>
+              <Button
+                onclick={() => openRepoRecordDirectory(localRepoPath, identifier)}
+                size="xs"
+                pill
+                outline
+                color="secondary"
+                class="p-2!"
+              >
+                <FolderArrowRightOutline size="xs" />
+              </Button>
+              <Tooltip>Open Record Directory</Tooltip>
+              <Button
+                onclick={() => removeRecord(rowIndex)}
+                size="xs"
+                pill
+                outline
+                color="red"
+                class="p-2!"><TrashBinOutline size="xs" /></Button
+              >
+              <Tooltip>Delete Record</Tooltip>
             </TableBodyCell>
-            <TableBodyCell><Checkbox /></TableBodyCell>
             <TableBodyCell>{identifier}</TableBodyCell>
             {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key }, colIndex (colIndex)}
               <TableBodyCell>

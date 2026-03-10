@@ -8,9 +8,10 @@
     InputAddon,
     Label,
     Select,
-    Span
+    Span,
+    Tooltip
   } from 'flowbite-svelte'
-  import { CirclePlusOutline, TrashBinOutline } from 'flowbite-svelte-icons'
+  import { CirclePlusOutline, RefreshOutline, TrashBinOutline } from 'flowbite-svelte-icons'
   import {
     MetadataValueType,
     type MetadataDescriptor,
@@ -21,12 +22,14 @@
     metadataDescriptors,
     liveRecords = $bindable(),
     liveIssues = $bindable(),
-    editRecordIndex = $bindable()
+    editRecordIndex = $bindable(),
+    refreshRecordFn
   }: {
     metadataDescriptors: MetadataDescriptor[]
     liveRecords: RepositoryRecord[]
     liveIssues: Record<string, Record<string, string[]>>
     editRecordIndex: number
+    refreshRecordFn: (identifier) => void
   } = $props()
   let recordData = $derived(liveRecords[editRecordIndex])
 
@@ -36,7 +39,7 @@
     value: ''
   })
   function onAddMetadata(): void {
-    recordData[createMetadata.key] = createMetadata.value
+    recordData.metadata[createMetadata.key] = createMetadata.value
     createMetadata.key = ''
     createMetadata.value = ''
   }
@@ -47,10 +50,21 @@
     id="drawer-label"
     class="mb-6 inline-flex items-center text-base font-semibold text-gray-500 uppercase dark:text-gray-400"
   >
+    <span class="mr-2">
+      <Button
+        size="xs"
+        onclick={() => refreshRecordFn(recordData.identifier)}
+        color="secondary"
+        pill
+        outline><RefreshOutline size="xs" /></Button
+      >
+      <Tooltip class="normal-case">Reload from Disk</Tooltip>
+    </span>
     Edit "{recordData.identifier}"
   </h5>
 
   <div class="flex flex-col">
+    <div class="mb-2"></div>
     {#each metadataDescriptors.filter(({ key }) => key != 'Identifier') as { key, required, value }, index (index)}
       <div class="mb-2">
         <Label>

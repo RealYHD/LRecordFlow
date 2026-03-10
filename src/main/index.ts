@@ -6,6 +6,8 @@ import { registerIPCHandleRetriever, registerIPCHandles } from './IpcIndexer'
 import * as repo from "./repo"
 import * as state from "./state"
 import * as dialog from "./dialog"
+import * as tabular from "./tabular"
+
 
 function createWindow(): void {
   // Create the browser window.
@@ -63,6 +65,7 @@ app.whenReady().then(() => {
   registerIPCHandles(repo, "repo")
   registerIPCHandles(state, "state")
   registerIPCHandles(dialog, "dialog")
+  registerIPCHandles(tabular, "tabular")
   registerIPCHandleRetriever()
   createWindow()
 
