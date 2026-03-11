@@ -25,7 +25,7 @@
     metadata.length = 0
     tabularPath = path
     previewTabular(tabularPath).then((value) => {
-      // TODO clear keyExamples
+      keyExamples = {}
       Object.assign(keyExamples, value)
       console.log($state.snapshot(keyExamples))
       for (const tabularKey in keyExamples) {
@@ -69,7 +69,11 @@
       )}>{metadata.length ? 'Change' : 'Open'} Tabular</Button
   >
   {#if metadata.length}
-    <ConfigureMetadataDescriptors bind:metadataDescriptors={metadata} valueExamples={keyExamples} />
+    <ConfigureMetadataDescriptors
+      bind:metadataDescriptors={metadata}
+      valueExamples={keyExamples}
+      maxExamples={10}
+    />
     <Button class="w-fit" onclick={() => addMetadataDescriptorCallback(metadata)}>Import</Button>
   {:else}
     <div class="m-8 text-center">

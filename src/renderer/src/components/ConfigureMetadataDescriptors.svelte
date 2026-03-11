@@ -14,9 +14,13 @@
   let metadataKeyOptionToAdd: string = $state('')
   let {
     metadataDescriptors = $bindable(),
-    valueExamples = null
-  }: { metadataDescriptors: MetadataDescriptor[]; valueExamples: Record<string, string[]> | null } =
-    $props()
+    valueExamples = null,
+    maxExamples = 10
+  }: {
+    metadataDescriptors: MetadataDescriptor[]
+    valueExamples: Record<string, string[]> | null
+    maxExamples: number
+  } = $props()
 </script>
 
 <Accordion flush>
@@ -78,13 +82,15 @@
           <div class="w-fit px-4 border-l-2 flex flex-col">
             Example Values:
             <ul class="flex-1 list-disc list-inside">
-              {#each valueExamples[metadataKeyValueDescriptor.key].slice(0, 5) as example, index (index)}
+              {#each valueExamples[metadataKeyValueDescriptor.key].slice(0, maxExamples) as example, index (index)}
                 <li>"{example}"</li>
               {:else}
                 No preview of values found!
               {/each}
-              {#if valueExamples[metadataKeyValueDescriptor.key].length > 5}
-                <li>and {valueExamples[metadataKeyValueDescriptor.key].length - 5} more...</li>
+              {#if valueExamples[metadataKeyValueDescriptor.key].length > maxExamples}
+                <li>
+                  and {valueExamples[metadataKeyValueDescriptor.key].length - maxExamples} more...
+                </li>
               {/if}
             </ul>
           </div>

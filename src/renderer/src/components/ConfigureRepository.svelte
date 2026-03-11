@@ -50,7 +50,11 @@
           </ButtonGroup>
         </div>
         {#if repoConfig.defined.length}
-          <ConfigureMetadataDescriptors bind:metadataDescriptors={repoConfig.defined} />
+          <ConfigureMetadataDescriptors
+            bind:metadataDescriptors={repoConfig.defined}
+            valueExamples={null}
+            maxExamples={10}
+          />
         {:else}
           <Span class="mx-auto py-5 px-3">No metadata associated with this record yet!</Span>
         {/if}

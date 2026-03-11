@@ -163,6 +163,7 @@
   }
 
   function loadRecords(): void {
+    flushAllModifiedRecords()
     liveRepoRecords.length = 0 // Delete entire array without re-instantiating
     loadRecordsFromStorage(localRepoPath).then((loadedRecords) => {
       for (const loadedRecord of loadedRecords) {

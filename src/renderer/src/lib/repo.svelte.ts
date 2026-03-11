@@ -245,3 +245,5 @@ export function openRepoRecordDirectory(localRepoPath: string, recordIdentifier:
 export function openRepoDirectory(localRepoPath: string) {
   return window['repo'].openRepoDirectory(localRepoPath)
 }
+
+
