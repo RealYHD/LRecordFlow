@@ -14,14 +14,7 @@
   } = $props()
 
   let tabularPath: string = $state('')
-  let tabularDataPreview: Record<string, string>[] = $state([])
-  let keyExamples: Record<string, string[]> = $derived.by(() => {
-    let generatedExamples: Record<string, string[]> = {}
-    for (const key of Object.keys(tabularDataPreview[0])) {
-      generatedExamples[key] = tabularDataPreview.map((data) => data[key])
-    }
-    return generatedExamples
-  })
+  let keyExamples: Record<string, string[]> = $state({})
   let definedMetadataDescriptorsById = $derived(
     Object.fromEntries(definedMetadataDescriptors.map((desc) => [desc.key, desc]))
   )
@@ -30,26 +23,35 @@
   function openTabular(path: string): void {
     if (!path.length) return
     metadata.length = 0
-    tabularDataPreview.length = 0
     tabularPath = path
-    previewTabular(tabularPath, 3).then((value) => {
-      tabularDataPreview.push(...value)
-      for (const tabularKey in tabularDataPreview[0]) {
-        let metadataDescriptor: MetadataDescriptor = {
+    previewTabular(tabularPath).then((value) => {
+      // TODO clear keyExamples
+      Object.assign(keyExamples, value)
+      console.log($state.snapshot(keyExamples))
+      for (const tabularKey in keyExamples) {
+        metadata.push({
           key: tabularKey,
           required: false,
           value: {
             valueType: MetadataValueType.Text,
             options: []
           }
-        }
+        })
+        let metadataDescriptor = metadata[metadata.length - 1]
         if (definedMetadataDescriptorsById[tabularKey]) {
           Object.assign(
             metadataDescriptor,
             $state.snapshot(definedMetadataDescriptorsById[tabularKey])
           )
         }
-        metadata.push(metadataDescriptor)
+        keyExamples[tabularKey] = keyExamples[tabularKey].filter(
+          (uniqueVal) => uniqueVal.trim() != ''
+        )
+        let uniqueValuesForKey = keyExamples[tabularKey].filter(
+          (val) => val.trim() != '' && !metadataDescriptor.value.options.includes(val)
+        )
+        if (uniqueValuesForKey.length > 0)
+          metadataDescriptor.value.options.push(...uniqueValuesForKey)
       }
     })
   }

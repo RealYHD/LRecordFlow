@@ -14,8 +14,8 @@
   let metadataKeyOptionToAdd: string = $state('')
   let {
     metadataDescriptors = $bindable(),
-    valueExamples = {}
-  }: { metadataDescriptors: MetadataDescriptor[]; valueExamples: Record<string, string[]> } =
+    valueExamples = null
+  }: { metadataDescriptors: MetadataDescriptor[]; valueExamples: Record<string, string[]> | null } =
     $props()
 </script>
 
@@ -23,8 +23,8 @@
   {#each metadataDescriptors as metadataKeyValueDescriptor, index (index)}
     <AccordionItem>
       {#snippet header()}Configure "{metadataKeyValueDescriptor.key}"{/snippet}
-      <div class="flex flex-wrap p-2">
-        <div class="space-y-2 flex-1 pr-4 mr-2">
+      <div class="flex flex-wrap p-2 items-stretch">
+        <div class="flex-1 space-y-2 px-4 border-l-2">
           <div>
             <Label class="mb-2">Set value type</Label>
             <Select
@@ -41,38 +41,51 @@
           </div>
           {#if metadataDescriptors[index].value.valueType == MetadataValueType.Options}
             <div class="mt-2 space-y-2">
-              <Label>Add option</Label>
-              <ButtonGroup>
-                <Input id="" bind:value={metadataKeyOptionToAdd} />
-                <Button
-                  onclick={() => {
-                    metadataKeyOptionToAdd = ''
-                    metadataDescriptors[index].value.options.push(metadataKeyOptionToAdd)
-                  }}
-                  disabled={metadataDescriptors[index].value.options.includes(
-                    metadataKeyOptionToAdd
-                  )}><PlusOutline /></Button
-                >
-              </ButtonGroup>
-              {#each { length: metadataDescriptors[index].value.options.length }, optionIndex}
+              <div>
+                <Label>Add option</Label>
                 <ButtonGroup>
-                  <Input bind:value={metadataDescriptors[index].value.options[optionIndex]} />
+                  <Input id="" bind:value={metadataKeyOptionToAdd} />
                   <Button
-                    onclick={() => metadataDescriptors[index].value.options.splice(optionIndex, 1)}
-                    ><TrashBinOutline /></Button
+                    onclick={() => {
+                      metadataKeyOptionToAdd = ''
+                      metadataDescriptors[index].value.options.push(metadataKeyOptionToAdd)
+                    }}
+                    disabled={metadataDescriptors[index].value.options.includes(
+                      metadataKeyOptionToAdd
+                    )}><PlusOutline /></Button
                   >
                 </ButtonGroup>
-              {/each}
+              </div>
+              <div class="flex-1 space-y-1 overflow-y-auto max-h-96">
+                {#each { length: metadataDescriptors[index].value.options.length }, optionIndex}
+                  <div>
+                    <ButtonGroup>
+                      <Input bind:value={metadataDescriptors[index].value.options[optionIndex]} />
+                      <Button
+                        onclick={() =>
+                          metadataDescriptors[index].value.options.splice(optionIndex, 1)}
+                        ><TrashBinOutline /></Button
+                      >
+                    </ButtonGroup>
+                  </div>
+                {/each}
+              </div>
             </div>
           {/if}
         </div>
-        {#if valueExamples[metadataKeyValueDescriptor.key]}
-          <div class="w-fit">
-            Examples values:
-            <ul class="list-disc list-inside">
-              {#each valueExamples[metadataKeyValueDescriptor.key].slice(0, 3) as example, index (index)}
-                <li>{example}</li>
+        <!-- List Example Values -->
+        {#if valueExamples != null}
+          <div class="w-fit px-4 border-l-2 flex flex-col">
+            Example Values:
+            <ul class="flex-1 list-disc list-inside">
+              {#each valueExamples[metadataKeyValueDescriptor.key].slice(0, 5) as example, index (index)}
+                <li>"{example}"</li>
+              {:else}
+                No preview of values found!
               {/each}
+              {#if valueExamples[metadataKeyValueDescriptor.key].length > 5}
+                <li>and {valueExamples[metadataKeyValueDescriptor.key].length - 5} more...</li>
+              {/if}
             </ul>
           </div>
         {/if}
