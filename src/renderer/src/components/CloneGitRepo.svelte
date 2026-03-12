@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button, ButtonGroup, Input, InputAddon, Label, Span } from 'flowbite-svelte'
+  import { Button, ButtonGroup, Input, Label, Span } from 'flowbite-svelte'
   import { selectSingleDirectory } from '../lib/dialog.svelte'
 
   let {
@@ -45,13 +45,11 @@
         bind:value={localInputValue}
         required
       />
-      <InputAddon>
-        <Button
-          class="btn join-item"
-          onclick={() => selectSingleDirectory().then((path) => (localInputValue = path))}
-          >Select</Button
-        >
-      </InputAddon>
+      <Button
+        class="btn join-item"
+        onclick={() => selectSingleDirectory().then((path) => (localInputValue = path))}
+        >Select</Button
+      >
     </ButtonGroup>
   </Label>
 </div>

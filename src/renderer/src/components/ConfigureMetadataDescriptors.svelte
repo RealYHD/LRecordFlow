@@ -15,16 +15,20 @@
   let {
     metadataDescriptors = $bindable(),
     valueExamples = null,
-    maxExamples = 10
+    metadataIssues = null,
+    maxExamples = 10,
+    hideMetadataKeys = []
   }: {
     metadataDescriptors: MetadataDescriptor[]
     valueExamples: Record<string, string[]> | null
+    metadataIssues: Record<string, string[]> | null
     maxExamples: number
+    hideMetadataKeys: string[]
   } = $props()
 </script>
 
 <Accordion flush>
-  {#each metadataDescriptors as metadataKeyValueDescriptor, index (index)}
+  {#each metadataDescriptors.filter((desc) => !hideMetadataKeys.includes(desc.key)) as metadataKeyValueDescriptor, index (index)}
     <AccordionItem>
       {#snippet header()}Configure "{metadataKeyValueDescriptor.key}"{/snippet}
       <div class="flex flex-wrap p-2 items-stretch">
@@ -92,6 +96,18 @@
                   and {valueExamples[metadataKeyValueDescriptor.key].length - maxExamples} more...
                 </li>
               {/if}
+            </ul>
+          </div>
+        {/if}
+        {#if metadataIssues != null}
+          <div class="w-fit px-4 border-l-2 flex flex-col">
+            Issues Found:
+            <ul class="flex-1 list-disc list-inside max-h-96 overflow-y-auto">
+              {#each metadataIssues[metadataKeyValueDescriptor.key] as issue, index (index)}
+                <li>{issue}</li>
+              {:else}
+                No issues found!
+              {/each}
             </ul>
           </div>
         {/if}

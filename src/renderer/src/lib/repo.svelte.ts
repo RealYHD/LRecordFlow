@@ -38,16 +38,11 @@ export function recordDataIsEqual(record1: RecordMetadata, record2: RecordMetada
   )
 }
 
-export async function loadRecords(localRepoPath: string): Promise<RepositoryRecord[]> {
-  let records: RepositoryRecord[] = []
-  let recordNames: string[] = await window['repo'].getAllRepoRecords(localRepoPath)
-  for (const identifier of recordNames) {
-    records.push(await loadRecord(localRepoPath, identifier))
-  }
-  return records
+export async function getAllRecordsForRepo(localRepoPath: string): Promise<string[]> {
+  return await window['repo'].getAllRepoRecords(localRepoPath)
 }
 
-export async function loadRecord(localRepoPath: string, identifier: string) {
+export async function loadRecordFromRepo(localRepoPath: string, identifier: string) {
   return {
     identifier: identifier,
     metadata: await window['repo'].getRecordMetadata(localRepoPath, identifier),
@@ -85,12 +80,6 @@ export function aggregateMetadataDescriptors(
 }
 
 export function cloneGitRepository(name: string, remote: string, local: string): void {
-  appStateStore.state.notifications.push({
-    date: new Date(),
-    message: `Began cloning repository ("${name}") from "${remote}" to "${local}"`,
-    status: 'Information',
-    title: `Cloning "${name}"`
-  })
   appStateStore.state.knownRepos.push({
     name: name,
     remote: remote,
@@ -101,25 +90,11 @@ export function cloneGitRepository(name: string, remote: string, local: string):
   window['repo']
     .cloneGitRepository(remote, local, name)
     .then((clonePath: string) => {
-      appStateStore.state.notifications.push({
-        date: new Date(),
-        message: `Completed cloning repository ("${name}") from "${remote}" to "${local}"`,
-        status: 'Information',
-        title: `Completed cloning "${name}"`
-      })
       let repo = appStateStore.state.knownRepos.find((repo) => repo.local == local)
       repo.status = 'Ready'
       repo.local = clonePath
     })
     .catch((err) => {
-      appStateStore.state.notifications.push({
-        date: new Date(),
-        message:
-          `Failed to clone repository "${name}" from "${remote}" to "${local}" due to following error\n` +
-          err.message,
-        status: 'Alert',
-        title: `Failed to clone repository "${name}"`
-      })
       appStateStore.state.knownRepos.find((repo) => repo.local == local).status = 'Not Ready'
     })
 }
@@ -238,12 +213,25 @@ export function validateMetadataKey(key: string, repoConfig: RepositoryConfigura
   return issues
 }
 
-export function openRepoRecordDirectory(localRepoPath: string, recordIdentifier: string) {
-  return window['repo'].openRepoRecordDirectory(localRepoPath, recordIdentifier)
+export async function openRepoRecordDirectory(localRepoPath: string, recordIdentifier: string) {
+  return await window['repo'].openRepoRecordDirectory(localRepoPath, recordIdentifier)
 }
 
-export function openRepoDirectory(localRepoPath: string) {
-  return window['repo'].openRepoDirectory(localRepoPath)
+export async function openRepoDirectory(localRepoPath: string) {
+  return await window['repo'].openRepoDirectory(localRepoPath)
 }
 
-
+export async function importRepoRecordsFromTabular(
+  localRepoPath: string,
+  tabularPath: string,
+  identifierCol: string,
+  pathColumns: string[]
+): Promise<string[]> {
+  return await window['repo'].importRepoRecordsFromTabular(
+    localRepoPath,
+    tabularPath,
+    identifierCol,
+    pathColumns
+  )
+}
+// TODO Currently, this overwrites... Maybe we should add a feature to check for overwrites

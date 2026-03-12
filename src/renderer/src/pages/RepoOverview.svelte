@@ -4,7 +4,6 @@
     countIssues,
     deleteRecord,
     getRepoConfig,
-    loadRecords as loadRecordsFromStorage,
     openRepoRecordDirectory,
     recordDataIsEqual,
     saveRecord,
@@ -15,7 +14,8 @@
     type RepositoryConfiguration,
     type RecordMetadata,
     type RepositoryRecord,
-    loadRecord
+    getAllRecordsForRepo,
+    loadRecordFromRepo
   } from '../lib/repo.svelte'
   import {
     Button,
@@ -48,7 +48,7 @@
   import { onMount } from 'svelte'
   import ConfigureRepository from '../components/ConfigureRepository.svelte'
   import { SvelteSet } from 'svelte/reactivity'
-  import TabularImport from '../components/TabularImport.svelte'
+  import TabularImport from '../components/TabularRecordImport.svelte'
   import { appStateStore } from '../lib/state.svelte'
 
   const localRepoPath = appStateStore.state.openedRepoPath
@@ -162,21 +162,27 @@
     }
   }
 
-  function loadRecords(): void {
+  function loadAllRecords(): void {
     flushAllModifiedRecords()
     liveRepoRecords.length = 0 // Delete entire array without re-instantiating
-    loadRecordsFromStorage(localRepoPath).then((loadedRecords) => {
-      for (const loadedRecord of loadedRecords) {
-        persistedRecordMetadata[loadedRecord.identifier] = $state.snapshot(loadedRecord.metadata)
+    getAllRecordsForRepo(localRepoPath).then((identifiers) => {
+      for (const identifier of identifiers) {
+        loadRecords(identifier)
       }
-      liveRepoRecords.push(...loadedRecords)
     })
   }
 
-  function reloadRecord(identifier: string): void {
-    loadRecord(localRepoPath, identifier).then((record) => {
-      Object.assign(liveRepoRecordsById[identifier], record)
-    })
+  function loadRecords(...identifiers: string[]): void {
+    for (const identifier of identifiers) {
+      loadRecordFromRepo(localRepoPath, identifier).then((record) => {
+        if (liveRepoRecordsById[identifier]) {
+          Object.assign(liveRepoRecordsById[identifier], record)
+        } else {
+          liveRepoRecords.push(record)
+        }
+        persistedRecordMetadata[identifier] = record
+      })
+    }
   }
 
   function loadRepoConfiguration(): void {
@@ -185,6 +191,24 @@
     getRepoConfig(localRepoPath).then((loadedConfig) => {
       Object.assign(liveRepoConfiguration, loadedConfig)
     })
+  }
+
+  function importTabular(
+    importedIdentifiers: string[],
+    metadataDescriptors: MetadataDescriptor[]
+  ): void {
+    importTabularOpen = false
+    for (const descriptor of metadataDescriptors) {
+      let matchingRepoConfigDesc = liveRepoConfiguration.defined.find(
+        (configDesc) => configDesc.key == descriptor.key
+      )
+      if (matchingRepoConfigDesc) {
+        Object.assign(matchingRepoConfigDesc, descriptor)
+      } else {
+        liveRepoConfiguration.defined.push(descriptor)
+      }
+    }
+    loadRecords(...importedIdentifiers)
   }
 
   function recordFlushTick(): void {
@@ -223,20 +247,8 @@
     }
   }
 
-  function addMetadataDescriptorDefinitions(metadataDescriptors: MetadataDescriptor[]): void {
-    for (const descriptor of metadataDescriptors) {
-      let matchingRepoConfigDesc = liveRepoConfiguration.defined.find(
-        (configDesc) => configDesc.key == descriptor.key
-      )
-      if (matchingRepoConfigDesc) {
-        Object.assign(matchingRepoConfigDesc, descriptor)
-      }
-      liveRepoConfiguration.defined.push(matchingRepoConfigDesc)
-    }
-  }
-
   onMount(() => {
-    loadRecords()
+    loadAllRecords()
     loadRepoConfiguration()
     flushIntervalTimerId = window.setInterval(recordFlushTick, flushTickInterval)
   })
@@ -252,7 +264,8 @@
 <Modal bind:open={importTabularOpen}>
   <TabularImport
     definedMetadataDescriptors={liveRepoConfiguration.defined}
-    addMetadataDescriptorCallback={addMetadataDescriptorDefinitions}
+    currentRecordsById={liveRepoRecordsById}
+    RecordImportCallback={importTabular}
   />
 </Modal>
 
@@ -272,7 +285,7 @@
     bind:liveRecords={liveRepoRecords}
     bind:liveIssues={liveRecordIssues}
     bind:editRecordIndex={editingLiveIndex}
-    refreshRecordFn={reloadRecord}
+    refreshRecordFn={loadRecords}
   />
 </Drawer>
 
@@ -356,7 +369,7 @@
               >
               <Tooltip>Edit Record Metadata</Tooltip>
               <Button
-                onclick={() => reloadRecord(identifier)}
+                onclick={() => loadRecords(identifier)}
                 size="xs"
                 pill
                 outline

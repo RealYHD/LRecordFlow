@@ -22,7 +22,6 @@
   <NavHamburger />
   <NavUl>
     <NavLi href={p('/')}>Open</NavLi>
-    <NavLi href={p('/notifications')}>Notifications</NavLi>
     <NavLi href={p('/help')}>Help</NavLi>
   </NavUl>
 </Navbar>

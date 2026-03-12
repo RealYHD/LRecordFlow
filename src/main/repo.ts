@@ -1,8 +1,9 @@
 import simpleGit, { GitResponseError, MergeResult, TaskOptions } from 'simple-git'
-import { access, copyFile, cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'fs/promises'
+import { access, copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'fs/promises'
 import path from 'path'
 import { shell } from 'electron'
 import Papa from 'papaparse'
+import { createReadStream } from 'fs'
 
 const recordMetadataFilename = 'record.json'
 const repoConfigurationFilename = 'configuration.json'
@@ -146,7 +147,7 @@ export async function repoExists(localRepoPath: string) {
   )
 }
 
-export async function getAllRepoRecords(localRepoPath: string) {
+export async function getAllRepoRecords(localRepoPath: string): Promise<string[]> {
   // TODO Perhaps in the future make this recursive for "nested records"?
   if (!(await repoExists(localRepoPath))) return []
   return (await readdir(localRepoPath, { withFileTypes: true }))
@@ -234,13 +235,15 @@ export async function importRepoRecordsFromTabular(
   tabularPath: string,
   identifierCol: string,
   pathColumns: string[]
-) {
+): Promise<string[]> {
+  console.log('importing...')
   return new Promise((resolve, reject) => {
     let identifiers: string[] = []
     let promises: Promise<void>[] = []
-    Papa.parse<Record<string, string>>(tabularPath, {
+    Papa.parse<Record<string, string>>(createReadStream(tabularPath), {
       header: true,
       step: (results) => {
+        console.log(results)
         if (results.errors.length) reject(results.errors)
         identifiers.push(results.data[identifierCol])
         promises.push(
@@ -267,6 +270,7 @@ export async function importRepoRecordsFromTabular(
         )
       },
       complete: (results) => {
+        console.log('results')
         if (results.errors.length) reject(results.errors)
         Promise.all(promises).then(() => {
           resolve(identifiers)
