@@ -42,7 +42,10 @@ export async function getAllRecordsForRepo(localRepoPath: string): Promise<strin
   return await window['repo'].getAllRepoRecords(localRepoPath)
 }
 
-export async function loadRecordFromRepo(localRepoPath: string, identifier: string) {
+export async function loadRecordFromRepo(
+  localRepoPath: string,
+  identifier: string
+): Promise<RepositoryRecord> {
   return {
     identifier: identifier,
     metadata: await window['repo'].getRecordMetadata(localRepoPath, identifier),

@@ -164,11 +164,8 @@
 
   function loadAllRecords(): void {
     flushAllModifiedRecords()
-    liveRepoRecords.length = 0 // Delete entire array without re-instantiating
     getAllRecordsForRepo(localRepoPath).then((identifiers) => {
-      for (const identifier of identifiers) {
-        loadRecords(identifier)
-      }
+      loadRecords(...identifiers)
     })
   }
 
@@ -180,7 +177,7 @@
         } else {
           liveRepoRecords.push(record)
         }
-        persistedRecordMetadata[identifier] = record
+        persistedRecordMetadata[identifier] = record.metadata
       })
     }
   }
@@ -212,6 +209,11 @@
   }
 
   function recordFlushTick(): void {
+    for (const modifiedRecordId in recordFlushDelays) {
+      if (!modifiedRecords.has(modifiedRecordId)) {
+        delete recordFlushDelays[modifiedRecordId]
+      }
+    }
     for (const modifiedRecordId of modifiedRecords) {
       if (liveRecordIssueCount[modifiedRecordId]) continue
       if (recordFlushDelays[modifiedRecordId]) {
@@ -248,8 +250,8 @@
   }
 
   onMount(() => {
-    loadAllRecords()
     loadRepoConfiguration()
+    loadAllRecords()
     flushIntervalTimerId = window.setInterval(recordFlushTick, flushTickInterval)
   })
 
@@ -323,7 +325,7 @@
             <Popover
               >Validation failed for {Object.keys(liveRecordIssueCount).length} (unsaved) records</Popover
             >
-          {:else if Object.keys(recordFlushDelays).length}
+          {:else if modifiedRecords.size && Object.keys(recordFlushDelays).length}
             <FloppyDiskOutline class="shrink-0" />
             <Popover>{modifiedRecords.size} records still pending saving...</Popover>
           {:else}
@@ -348,7 +350,7 @@
                   {liveRecordIssueCount[identifier]} issue(s) found with metadata associated with this
                   record. Updates will not be saved until fixed.
                 </Popover>
-              {:else if recordFlushDelays[identifier]}
+              {:else if modifiedRecords.has(identifier) && recordFlushDelays[identifier]}
                 <FloppyDiskOutline color="primary" class="shrink-0" />
                 <Popover>
                   Saving record in {recordFlushDelays[identifier].delay} seconds...
