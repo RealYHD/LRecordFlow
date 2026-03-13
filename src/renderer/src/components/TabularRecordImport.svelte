@@ -20,7 +20,6 @@
     currentRecordsById: Record<string, RepositoryRecord>
     RecordImportCallback: (identifiers: string[], metadataDescriptors: MetadataDescriptor[]) => void
   } = $props()
-  $inspect(definedMetadataDescriptors)
   let tabularPath: string = $state('')
   let ImportPromiseDescId: string = $derived(`Import Tabular @ ${tabularPath}`)
   let definedMetadataDescriptorsByKey: Record<string, MetadataDescriptor> = $derived(
@@ -67,7 +66,10 @@
     return {}
   })
   let working: boolean = $derived(
-    tabularPath.length ? Boolean(appStateStore.promises.get(ImportPromiseDescId)) : false
+    tabularPath.length
+      ? appStateStore.promises.get(ImportPromiseDescId) &&
+          appStateStore.promises.get(ImportPromiseDescId).endTime == null
+      : false
   )
 
   function openTabular(path: string): void {
@@ -77,6 +79,7 @@
       metadataUniqueValues = {}
       Object.assign(metadataUniqueValues, value)
     })
+    identifierCol = ''
   }
 </script>
 
@@ -88,67 +91,67 @@
     class="w-fit"
     disabled={working}
     onclick={() => {
-      working = true
       selectSingleFileOfType([{ name: 'Comma separated value', extensions: ['csv'] }]).then(
         (path) => {
-          working = false
           openTabular(path)
         }
       )
-    }}>{metadataDescriptors.length ? 'Change' : 'Open'} Tabular</Button
+    }}>{tabularPath.length ? 'Change' : 'Open'} Tabular</Button
   >
-  {#if metadataDescriptors.length}
-    <Label>Select Identifier Column</Label>
-    <Select
-      disabled={working}
-      items={metadataDescriptors.map((desc) => ({ name: desc.key, value: desc.key }))}
-      bind:value={identifierCol}
-    />
-  {/if}
-  {#if identifierCol != '' && metadataDescriptors.length}
+  {#if tabularPath.length}
     <div>
-      The following record identifiers already exist within the repository:
-      <ul class="flex-1 list-disc list-inside max-h-96 overflow-y-auto">
-        {#each overlappingIdentifiers as identifier, index (index)}
-          <li>{identifier}</li>
-        {/each}
-      </ul>
+      <Label>Select Identifier Column</Label>
+      <Select
+        disabled={working}
+        items={metadataDescriptors.map((desc) => ({ name: desc.key, value: desc.key }))}
+        bind:value={identifierCol}
+      />
     </div>
-    <ConfigureMetadataDescriptors
-      bind:metadataDescriptors
-      valueExamples={metadataUniqueValues}
-      {metadataIssues}
-      maxExamples={10}
-      hideMetadataKeys={[identifierCol]}
-    />
-    <Button
-      class="w-fit"
-      disabled={working}
-      onclick={() => {
-        working = true
-        trackPromise({
-          id: $state.snapshot(ImportPromiseDescId),
-          title: `Import "${tabularPath}"`,
-          startTime: new Date(),
-          promise: importRepoRecordsFromTabular(
-            appStateStore.state.openedRepoPath,
-            tabularPath,
-            identifierCol,
-            pathCols
-          ).then((identifiers) => {
-            console.log('adding...')
-            console.log(identifiers)
-            RecordImportCallback(
-              identifiers,
-              metadataDescriptors.filter((desc) => desc.key != identifierCol)
-            )
-            working = false
-          }),
-          status: `Importing "${tabularPath}"`,
-          endTime: null
-        })
-      }}>Import</Button
-    >
+    {#if identifierCol != ''}
+      <div>
+        {#if overlappingIdentifiers.length}
+          The following record identifiers already exist within the repository:
+          <ul class="flex-1 list-disc list-inside max-h-96 overflow-y-auto">
+            {#each overlappingIdentifiers as identifier, index (index)}
+              <li>{identifier}</li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
+      <ConfigureMetadataDescriptors
+        bind:metadataDescriptors
+        valueExamples={metadataUniqueValues}
+        {metadataIssues}
+        maxExamples={10}
+        hideMetadataKeys={[identifierCol]}
+      />
+      <Button
+        class="w-fit"
+        disabled={working}
+        onclick={() => {
+          trackPromise({
+            id: $state.snapshot(ImportPromiseDescId),
+            title: `Import "${tabularPath}"`,
+            startTime: new Date(),
+            promise: importRepoRecordsFromTabular(
+              appStateStore.state.openedRepoPath,
+              tabularPath,
+              identifierCol,
+              pathCols
+            ).then((identifiers) => {
+              console.log('adding...')
+              console.log(identifiers)
+              RecordImportCallback(
+                identifiers,
+                metadataDescriptors.filter((desc) => desc.key != identifierCol)
+              )
+            }),
+            status: `Importing "${tabularPath}"`,
+            endTime: null
+          })
+        }}>Import</Button
+      >
+    {/if}
   {:else}
     <div class="m-8 text-center">
       Nothing to show! Begin by opening a tabular file for exploration and metadata mapping.

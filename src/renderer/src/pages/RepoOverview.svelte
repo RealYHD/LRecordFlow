@@ -315,7 +315,7 @@
     </Button>
   </div>
   <div>
-    <Table hoverable={true} border={true} shadow>
+    <Table hoverable={true} border={true}>
       <TableHead class="normal-case">
         <TableHeadCell class="w-fit">
           {#if totalIssueCount}

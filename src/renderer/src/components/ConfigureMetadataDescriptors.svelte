@@ -28,9 +28,26 @@
 </script>
 
 <Accordion flush>
-  {#each metadataDescriptors.filter((desc) => !hideMetadataKeys.includes(desc.key)) as metadataKeyValueDescriptor, index (index)}
+  {#each metadataDescriptors.filter((desc) => !hideMetadataKeys.includes(desc.key)) as descriptor, index (index)}
     <AccordionItem>
-      {#snippet header()}Configure "{metadataKeyValueDescriptor.key}"{/snippet}
+      {#snippet header()}
+        <div>
+          <Button
+            class="mr-4"
+            size="xs"
+            onclick={(e: MouseEvent) => {
+              e.stopPropagation()
+              metadataDescriptors.splice(
+                metadataDescriptors.findIndex((desc) => desc.key == descriptor.key),
+                1
+              )
+            }}
+            color="secondary"
+            outline><TrashBinOutline size="xs" /></Button
+          >
+          <span>Configure "{descriptor.key}"</span>
+        </div>
+      {/snippet}
       <div class="flex flex-wrap p-2 items-stretch">
         <div class="flex-1 space-y-2 px-4 border-l-2">
           <div>
@@ -86,14 +103,14 @@
           <div class="w-fit px-4 border-l-2 flex flex-col">
             Example Values:
             <ul class="flex-1 list-disc list-inside">
-              {#each valueExamples[metadataKeyValueDescriptor.key].slice(0, maxExamples) as example, index (index)}
+              {#each valueExamples[descriptor.key].slice(0, maxExamples) as example, index (index)}
                 <li>"{example}"</li>
               {:else}
                 No preview of values found!
               {/each}
-              {#if valueExamples[metadataKeyValueDescriptor.key].length > maxExamples}
+              {#if valueExamples[descriptor.key].length > maxExamples}
                 <li>
-                  and {valueExamples[metadataKeyValueDescriptor.key].length - maxExamples} more...
+                  and {valueExamples[descriptor.key].length - maxExamples} more...
                 </li>
               {/if}
             </ul>
@@ -103,7 +120,7 @@
           <div class="w-fit px-4 border-l-2 flex flex-col">
             Issues Found:
             <ul class="flex-1 list-disc list-inside max-h-96 overflow-y-auto">
-              {#each metadataIssues[metadataKeyValueDescriptor.key] as issue, index (index)}
+              {#each metadataIssues[descriptor.key] as issue, index (index)}
                 <li>{issue}</li>
               {:else}
                 No issues found!

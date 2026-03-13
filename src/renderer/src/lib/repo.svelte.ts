@@ -156,8 +156,8 @@ export function validateRecords(
         case MetadataValueType.File:
           if (record.files.length && !record.files.includes(recordStringValue))
             metadataIssues.push(`"${key}" is not a known file name associated with record.`)
-          if (!record.files.length && recordStringValue.length > 0)
-            metadataIssues.push(`"${key}" is not a known file name associated with record.`)
+          if (!record.files.length)
+            metadataIssues.push(`Record has no files associated with the record to select.`)
       }
     }
   }
