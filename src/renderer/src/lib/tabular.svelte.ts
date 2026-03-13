@@ -1,3 +1,3 @@
-export async function previewTabular(path: string, rowsToPreview: number = 1): Promise<Record<string,string[]>> {
-    return await window['tabular'].previewTabular(path)
+export async function previewTabular(path: string): Promise<Record<string, Record<string, number>>> {
+  return await window['tabular'].previewTabular(path)
 }

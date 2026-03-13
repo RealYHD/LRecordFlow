@@ -236,14 +236,12 @@ export async function importRepoRecordsFromTabular(
   identifierCol: string,
   pathColumns: string[]
 ): Promise<string[]> {
-  console.log('importing...')
   return new Promise((resolve, reject) => {
     let identifiers: string[] = []
     let promises: Promise<void>[] = []
     Papa.parse<Record<string, string>>(createReadStream(tabularPath), {
       header: true,
       step: (results) => {
-        console.log(results)
         if (results.errors.length) reject(results.errors)
         identifiers.push(results.data[identifierCol])
         promises.push(
@@ -251,6 +249,7 @@ export async function importRepoRecordsFromTabular(
             let recordMetadata = {}
             Object.assign(recordMetadata, results.data)
             delete recordMetadata[identifierCol]
+            console.log(recordMetadata)
             for (const pathCol of pathColumns) {
               recordMetadata[pathCol] = path.basename(results.data[pathCol])
               promises.push(
@@ -259,13 +258,13 @@ export async function importRepoRecordsFromTabular(
                   path.join(localRepoPath, results.data[identifierCol], recordMetadata[pathCol])
                 )
               )
-              promises.push(
-                writeFile(
-                  path.join(localRepoPath, results.data[identifierCol], recordMetadataFilename),
-                  JSON.stringify(recordMetadata)
-                )
-              )
             }
+            promises.push(
+              writeFile(
+                path.join(localRepoPath, results.data[identifierCol], recordMetadataFilename),
+                JSON.stringify(recordMetadata)
+              )
+            )
           })
         )
       },

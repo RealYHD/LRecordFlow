@@ -25,10 +25,15 @@
   let definedMetadataDescriptorsByKey: Record<string, MetadataDescriptor> = $derived(
     Object.fromEntries(definedMetadataDescriptors.map((desc) => [desc.key, desc]))
   )
-  let metadataUniqueValues: Record<string, string[]> = $state({})
+  let metadataValueOccurrences: Record<string, Record<string, number>> = $state({})
+  let metadataUniqueValues: Record<string, string[]> = $derived(
+    Object.fromEntries(
+      Object.entries(metadataValueOccurrences).map(([key, values]) => [key, Object.keys(values)])
+    )
+  )
   let metadataDescriptors: MetadataDescriptor[] = $derived.by(() => {
     let descs: MetadataDescriptor[] = $state([])
-    for (const tabularKey in metadataUniqueValues) {
+    for (const tabularKey in metadataValueOccurrences) {
       descs.push({
         key: tabularKey,
         required: false,
@@ -41,10 +46,7 @@
       if (definedMetadataDescriptorsByKey[tabularKey]) {
         Object.assign(desc, $state.snapshot(definedMetadataDescriptorsByKey[tabularKey]))
       }
-      let uniqueValuesForKey = metadataUniqueValues[tabularKey].filter(
-        (val) => val.trim() != '' && !desc.value.options.includes(val)
-      )
-      if (uniqueValuesForKey.length > 0) desc.value.options.push(...uniqueValuesForKey)
+      desc.value.options.push(...Object.keys(metadataValueOccurrences[tabularKey]))
     }
     return descs
   })
@@ -56,10 +58,15 @@
   )
   let overlappingIdentifiers = $derived(
     Array.from(
-      new Set(metadataUniqueValues[identifierCol]).intersection(
+      new Set(Object.keys(metadataValueOccurrences[identifierCol])).intersection(
         new Set(Object.keys(currentRecordsById))
       )
     )
+  )
+  let duplicateIdentifiers: string[] = $derived(
+    Object.entries(metadataValueOccurrences[identifierCol] || {})
+      .filter(([, occurrence]) => occurrence > 1)
+      .map(([val]) => val)
   )
   let metadataIssues: Record<string, string[]> = $derived.by(() => {
     // TODO show what records don't conform to current settings
@@ -76,11 +83,12 @@
     if (!path.length) return
     tabularPath = path
     previewTabular(tabularPath).then((value) => {
-      metadataUniqueValues = {}
-      Object.assign(metadataUniqueValues, value)
+      metadataValueOccurrences = value
     })
     identifierCol = ''
   }
+
+  $inspect(duplicateIdentifiers)
 </script>
 
 <div>Import Records from Tabular</div>
@@ -108,49 +116,63 @@
       />
     </div>
     {#if identifierCol != ''}
-      <div>
-        {#if overlappingIdentifiers.length}
-          The following record identifiers already exist within the repository:
+      {#if duplicateIdentifiers.length}
+        <div>
+          The selected column to act as record identifiers has repeated values. Identifiers within a
+          repository must be unique. The following identifiers are not unique:
           <ul class="flex-1 list-disc list-inside max-h-96 overflow-y-auto">
-            {#each overlappingIdentifiers as identifier, index (index)}
-              <li>{identifier}</li>
+            {#each duplicateIdentifiers as identifier, index (index)}
+              <li>"{identifier}"</li>
             {/each}
           </ul>
-        {/if}
-      </div>
-      <ConfigureMetadataDescriptors
-        bind:metadataDescriptors
-        valueExamples={metadataUniqueValues}
-        {metadataIssues}
-        maxExamples={10}
-        hideMetadataKeys={[identifierCol]}
-      />
-      <Button
-        class="w-fit"
-        disabled={working}
-        onclick={() => {
-          trackPromise({
-            id: $state.snapshot(ImportPromiseDescId),
-            title: `Import "${tabularPath}"`,
-            startTime: new Date(),
-            promise: importRepoRecordsFromTabular(
-              appStateStore.state.openedRepoPath,
-              tabularPath,
-              identifierCol,
-              pathCols
-            ).then((identifiers) => {
-              console.log('adding...')
-              console.log(identifiers)
-              RecordImportCallback(
-                identifiers,
-                metadataDescriptors.filter((desc) => desc.key != identifierCol)
-              )
-            }),
-            status: `Importing "${tabularPath}"`,
-            endTime: null
-          })
-        }}>Import</Button
-      >
+        </div>
+      {:else}
+        <div>
+          {#if overlappingIdentifiers.length}
+            The following record identifiers already exist within the repository and <strong
+              >will be overwritten</strong
+            >:
+            <ul class="flex-1 list-disc list-inside max-h-96 overflow-y-auto">
+              {#each overlappingIdentifiers as identifier, index (index)}
+                <li>{identifier}</li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
+        <ConfigureMetadataDescriptors
+          bind:metadataDescriptors
+          valueExamples={metadataUniqueValues}
+          {metadataIssues}
+          maxExamples={10}
+          hideMetadataKeys={[identifierCol]}
+        />
+        <Button
+          class="w-fit"
+          disabled={working}
+          onclick={() => {
+            trackPromise({
+              id: $state.snapshot(ImportPromiseDescId),
+              title: `Import "${tabularPath}"`,
+              startTime: new Date(),
+              promise: importRepoRecordsFromTabular(
+                appStateStore.state.openedRepoPath,
+                tabularPath,
+                identifierCol,
+                pathCols
+              ).then((identifiers) => {
+                console.log('adding...')
+                console.log(identifiers)
+                RecordImportCallback(
+                  identifiers,
+                  metadataDescriptors.filter((desc) => desc.key != identifierCol)
+                )
+              }),
+              status: `Importing "${tabularPath}"`,
+              endTime: null
+            })
+          }}>Import</Button
+        >
+      {/if}
     {/if}
   {:else}
     <div class="m-8 text-center">
