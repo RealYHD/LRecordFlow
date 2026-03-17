@@ -4,9 +4,13 @@ import path from 'path'
 import { shell } from 'electron'
 import Papa from 'papaparse'
 import { createReadStream } from 'fs'
+import { check, lock, unlock } from 'proper-lockfile'
+import { userInfo } from 'os'
 
-const recordMetadataFilename = 'record.json'
-const repoConfigurationFilename = 'configuration.json'
+const recordMetadataFilename = '.lrf.record.json'
+const repoConfigurationFilename = '.lrf.config.json'
+const recordLockInfo = '.lrf.lock-info.json'
+
 const ignoredRecordFolders = ['.git']
 function getRecordPath(localRepoPath: string, recordIdentifier: string): string {
   return path.join(localRepoPath, recordIdentifier)
@@ -79,6 +83,25 @@ export async function recordExists(
     return false
   }
   return (await stat(recordDirectory)).isDirectory()
+}
+
+export async function attemptLockRecord(
+  localRepoPath: string,
+  recordIdentifier: string
+): Promise<null | { currentUser: string }> {
+  let recordPath = path.join(localRepoPath, recordIdentifier)
+  let recordLockInfoPath = path.join(localRepoPath, recordIdentifier, recordLockInfo)
+  let lockInfo = {
+    currentUser: userInfo().username
+  }
+  try {
+    await lock(recordPath)
+    // TODO write record lock information
+    return null
+  } catch (error) {
+    // TODO check if it exists, if not, return generic message
+    return JSON.parse(await readFile(recordLockInfoPath, 'utf-8'))
+  }
 }
 
 export async function recordHasMetadata(
