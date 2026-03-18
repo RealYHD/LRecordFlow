@@ -1,4 +1,4 @@
-import { appStateStore } from './state.svelte'
+import { appStateStore, trackPromise } from './state.svelte'
 
 export type RepositoryRecord = {
   identifier: string
@@ -28,6 +28,9 @@ export interface RepositoryConfiguration {
   defined: MetadataDescriptor[]
   exactKeys: boolean
 }
+
+export const syncPromiseId = 'Remote Sync'
+export const tabularImportPromiseId = 'Tabular Import'
 
 export function recordDataIsEqual(record1: RecordMetadata, record2: RecordMetadata) {
   if (record1 == record2) return true
@@ -229,12 +232,37 @@ export async function importRepoRecordsFromTabular(
   tabularPath: string,
   identifierCol: string,
   pathColumns: string[]
-): Promise<string[]> {
-  return await window['repo'].importRepoRecordsFromTabular(
-    localRepoPath,
-    tabularPath,
-    identifierCol,
-    pathColumns
-  )
+): Promise<string[] | null> {
+  if (!appStateStore.promises.has(syncPromiseId)) {
+    return trackPromise({
+      id: tabularImportPromiseId,
+      promise: window['repo'].importRepoRecordsFromTabular(
+        localRepoPath,
+        tabularPath,
+        identifierCol,
+        pathColumns
+      ),
+      title: 'Importing Tabular Data',
+      startTime: new Date(),
+      endTime: null,
+      status: 'Importing tabular file'
+    }).promise
+  }
+  return null
 }
-// TODO Currently, this overwrites... Maybe we should add a feature to check for overwrites
+
+export async function remoteSyncStatus(
+  localRepoPath: string
+): Promise<{ ahead: number; behind: number; files: string[] } | null> {
+  if (!appStateStore.promises.has(syncPromiseId)) {
+    return trackPromise({
+      id: syncPromiseId,
+      promise: window['repo'].remoteSyncStatus(localRepoPath),
+      title: 'Syncing with Remote',
+      startTime: new Date(),
+      endTime: null,
+      status: 'Running git fetch to synchronize local repository history with remote.'
+    }).promise
+  }
+  return null
+}

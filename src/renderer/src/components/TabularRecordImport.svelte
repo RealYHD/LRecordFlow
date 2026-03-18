@@ -3,13 +3,14 @@
   import {
     importRepoRecordsFromTabular,
     MetadataValueType,
+    tabularImportPromiseId,
     type MetadataDescriptor,
     type RepositoryRecord
   } from '../lib/repo.svelte'
   import { selectSingleFileOfType } from '../lib/dialog.svelte'
   import { previewTabular } from '../lib/tabular.svelte'
   import ConfigureMetadataDescriptors from './ConfigureMetadataDescriptors.svelte'
-  import { appStateStore, trackPromise } from '../lib/state.svelte'
+  import { appStateStore, isTrackedPromiseComplete } from '../lib/state.svelte'
 
   let {
     definedMetadataDescriptors,
@@ -21,7 +22,6 @@
     RecordImportCallback: (identifiers: string[], metadataDescriptors: MetadataDescriptor[]) => void
   } = $props()
   let tabularPath: string = $state('')
-  let ImportPromiseDescId: string = $derived(`Import Tabular @ ${tabularPath}`)
   let definedMetadataDescriptorsByKey: Record<string, MetadataDescriptor> = $derived(
     Object.fromEntries(definedMetadataDescriptors.map((desc) => [desc.key, desc]))
   )
@@ -73,10 +73,7 @@
     return {}
   })
   let working: boolean = $derived(
-    tabularPath.length
-      ? appStateStore.promises.get(ImportPromiseDescId) &&
-          appStateStore.promises.get(ImportPromiseDescId).endTime == null
-      : false
+    tabularPath.length ? isTrackedPromiseComplete(tabularImportPromiseId) : false
   )
 
   function openTabular(path: string): void {
@@ -150,25 +147,16 @@
           class="w-fit"
           disabled={working}
           onclick={() => {
-            trackPromise({
-              id: $state.snapshot(ImportPromiseDescId),
-              title: `Import "${tabularPath}"`,
-              startTime: new Date(),
-              promise: importRepoRecordsFromTabular(
-                appStateStore.state.openedRepoPath,
-                tabularPath,
-                identifierCol,
-                pathCols
-              ).then((identifiers) => {
-                console.log('adding...')
-                console.log(identifiers)
-                RecordImportCallback(
-                  identifiers,
-                  metadataDescriptors.filter((desc) => desc.key != identifierCol)
-                )
-              }),
-              status: `Importing "${tabularPath}"`,
-              endTime: null
+            importRepoRecordsFromTabular(
+              appStateStore.state.openedRepoPath,
+              tabularPath,
+              identifierCol,
+              pathCols
+            ).then((identifiers) => {
+              RecordImportCallback(
+                identifiers,
+                metadataDescriptors.filter((desc) => desc.key != identifierCol)
+              )
             })
           }}>Import</Button
         >
