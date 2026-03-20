@@ -9,8 +9,8 @@
     Label,
     Select
   } from 'flowbite-svelte'
-  import { MetadataValueType, type MetadataDescriptor } from '../lib/repo.svelte'
   import { PlusOutline, TrashBinOutline } from 'flowbite-svelte-icons'
+  import { MetadataValueType, type MetadataDescriptor } from '../../../common/types/models'
   let metadataKeyOptionToAdd: string = $state('')
   let {
     metadataDescriptors = $bindable(),

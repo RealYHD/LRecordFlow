@@ -4,9 +4,14 @@ import path from 'path'
 import { shell } from 'electron'
 import Papa from 'papaparse'
 import { createReadStream } from 'fs'
+import { check, lock, unlock } from 'proper-lockfile'
+import { userInfo } from 'os'
+import { RecordDirStatus, RecordLockStatus } from '../common/types/models'
 
-const recordMetadataFilename = 'record.json'
-const repoConfigurationFilename = 'configuration.json'
+const recordMetadataFilename = '.lrf.record.json'
+const repoConfigurationFilename = '.lrf.config.json'
+const recordLockInfo = '.lrf.lock-info.json'
+
 const ignoredRecordFolders = ['.git']
 function getRecordPath(localRepoPath: string, recordIdentifier: string): string {
   return path.join(localRepoPath, recordIdentifier)
@@ -79,6 +84,58 @@ export async function recordExists(
     return false
   }
   return (await stat(recordDirectory)).isDirectory()
+}
+
+export async function attemptLockRecord(
+  localRepoPath: string,
+  recordIdentifier: string
+): Promise<boolean> {
+  let recordPath = path.join(localRepoPath, recordIdentifier)
+  let recordLockInfoPath = path.join(localRepoPath, recordIdentifier, recordLockInfo)
+  let lockInfo = {
+    currentUser: userInfo().username,
+    lockDate: new Date()
+  }
+  try {
+    await lock(recordPath)
+    await writeFile(recordLockInfoPath, JSON.stringify(lockInfo))
+    return true
+  } catch (error) {
+    // TODO check if it exists, if not, return generic message
+    // TODO check if it's the same user as the one currently trying to edit (indicates multiple instances of the software is open)
+    return false
+  }
+}
+
+export async function attemptUnlockRecord(localRepoPath: string, recordIdentifier: string) {
+  let recordPath = path.join(localRepoPath, recordIdentifier)
+  let recordLockInfoPath = path.join(localRepoPath, recordIdentifier, recordLockInfo)
+  try {
+    await unlock(recordPath)
+    await rm(recordLockInfoPath, { force: true })
+    return true
+  } catch (error) {
+    if (await check(recordPath)) {
+      throw error
+    } else {
+      return false
+    }
+  }
+}
+
+export async function getRecordDirStats(
+  localRepoPath: string,
+  recordIdentifier: string
+): Promise<RecordDirStatus> {
+  let recordPath = path.join(localRepoPath, recordIdentifier)
+  let recordLockInfoPath = path.join(localRepoPath, recordIdentifier, recordLockInfo)
+  let lastModifiedTime = (await stat(recordPath)).mtime
+  if (await check(recordPath)) {
+    let lockStatus: RecordLockStatus = JSON.parse(await readFile(recordLockInfoPath, 'utf-8'))
+    return { lastModified: lastModifiedTime, lockStatus: lockStatus }
+  } else {
+    return { lastModified: lastModifiedTime, lockStatus: null }
+  }
 }
 
 export async function recordHasMetadata(

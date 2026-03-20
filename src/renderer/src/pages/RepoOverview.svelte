@@ -10,12 +10,11 @@
     setRepoConfig,
     validateRecordIdentifier,
     validateRecords,
-    type MetadataDescriptor,
-    type RepositoryConfiguration,
-    type RecordMetadata,
-    type RepositoryRecord,
     getAllRecordsForRepo,
-    loadRecordFromRepo
+    loadRecordFromRepo,
+    getRecordDirStats,
+    attemptLockRecord,
+    attemptUnlockRecord
   } from '../lib/repo.svelte'
   import {
     Button,
@@ -49,9 +48,14 @@
   import ConfigureRepository from '../components/ConfigureRepository.svelte'
   import { SvelteSet } from 'svelte/reactivity'
   import TabularImport from '../components/TabularRecordImport.svelte'
-  import { appStateStore } from '../lib/state.svelte'
-
-  const localRepoPath = appStateStore.state.openedRepoPath
+  import { appStateStore, loadAppState } from '../lib/state.svelte'
+  import type {
+    MetadataDescriptor,
+    RecordDirStatus,
+    RecordMetadata,
+    RepositoryConfiguration,
+    RepositoryRecord
+  } from '../../../common/types/models'
 
   let liveRepoConfiguration: RepositoryConfiguration = $state({
     defined: [],
@@ -65,17 +69,23 @@
     Object.fromEntries(liveRepoRecords.map((recordData) => [recordData.identifier, recordData]))
   )
 
-  const flushDelay = 2 * 1000
-  const flushTickInterval = 1000
+  const recordFlushTickInterval = 1000
+  const recordFlushInterval = 2 * recordFlushTickInterval
+  const recordStatTickInterval = 1000
+  const recordStatInterval = 5 * recordStatTickInterval
+  let recordStatTimer = $state(recordStatInterval)
+  let retrievingRecordStats = $state(false)
+  const liveRecordStats: Record<string, RecordDirStatus> = $state({})
   const persistedRecordMetadata: Record<string, RecordMetadata> = $state({})
   const modifiedRecords: SvelteSet<string> = $derived(
     calcModifiedRecords(liveRepoRecords, persistedRecordMetadata)
   )
-  const recordFlushDelays: Record<
+  const recordFlushTimers: Record<
     string,
     { delay: number; flushing: boolean; snapshot: RecordMetadata }
   > = $state({})
   let flushIntervalTimerId = -1
+  let recordLockUpdateTimerId = -1
 
   const displayedRows: RepositoryRecord[] = $derived(liveRepoRecords) // TODO do something with this...
   const displayedMetadata: MetadataDescriptor[] = $derived(liveMetadataDescriptors)
@@ -113,12 +123,19 @@
 
   function editRecord(editRecordIndex: number): void {
     editingLiveIndex = editRecordIndex
-    editRecordDataOpen = true
+    let recordIdentifier = liveRepoRecords[editRecordIndex].identifier
+    attemptLockRecord(appStateStore.state.openedRepoPath, recordIdentifier).then((success) => {
+      if (success) {
+        editRecordDataOpen = true
+      } else {
+        // TODO display error message :)
+      }
+    })
   }
 
   function removeRecord(deleteRecordIndex: number): void {
     const recordIdentifier = liveRepoRecords[deleteRecordIndex].identifier
-    deleteRecord(localRepoPath, recordIdentifier).then(() => {
+    deleteRecord(appStateStore.state.openedRepoPath, recordIdentifier).then(() => {
       liveRepoRecords.splice(deleteRecordIndex, 1)
       delete persistedRecordMetadata[recordIdentifier]
     })
@@ -145,13 +162,25 @@
   function flushRecord(recordIdentifier: string): void {
     let modifiedRecord = liveRepoRecordsById[recordIdentifier]
     saveRecord(
-      localRepoPath,
+      appStateStore.state.openedRepoPath,
       modifiedRecord.identifier,
       $state.snapshot(modifiedRecord.metadata)
     ).then(() => {
-      delete recordFlushDelays[modifiedRecord.identifier]
+      delete recordFlushTimers[modifiedRecord.identifier]
       modifiedRecords.delete(modifiedRecord.identifier)
       persistedRecordMetadata[modifiedRecord.identifier] = $state.snapshot(modifiedRecord.metadata)
+      if (
+        !editRecordDataOpen ||
+        liveRepoRecords[editingLiveIndex].identifier != modifiedRecord.identifier
+      ) {
+        attemptUnlockRecord(appStateStore.state.openedRepoPath, recordIdentifier).then(
+          (success) => {
+            if (success) {
+              liveRecordStats[recordIdentifier].lockStatus = null
+            }
+          }
+        )
+      }
     })
   }
 
@@ -162,16 +191,18 @@
     }
   }
 
-  function loadAllRecords(): void {
+  function reloadAllRecords(): void {
     flushAllModifiedRecords()
-    getAllRecordsForRepo(localRepoPath).then((identifiers) => {
-      loadRecords(...identifiers)
+    console.log(appStateStore.state.openedRepoPath)
+    getAllRecordsForRepo(appStateStore.state.openedRepoPath).then((identifiers) => {
+      loadRecord(...identifiers)
     })
   }
 
-  function loadRecords(...identifiers: string[]): void {
+  function loadRecord(...identifiers: string[]): void {
+    console.log('run')
     for (const identifier of identifiers) {
-      loadRecordFromRepo(localRepoPath, identifier).then((record) => {
+      loadRecordFromRepo(appStateStore.state.openedRepoPath, identifier).then((record) => {
         if (liveRepoRecordsById[identifier]) {
           Object.assign(liveRepoRecordsById[identifier], record)
         } else {
@@ -182,10 +213,10 @@
     }
   }
 
-  function loadRepoConfiguration(): void {
+  function reloadRepoConfiguration(): void {
     liveRepoConfiguration.defined = []
     liveRepoConfiguration.exactKeys = false
-    getRepoConfig(localRepoPath).then((loadedConfig) => {
+    getRepoConfig(appStateStore.state.openedRepoPath).then((loadedConfig) => {
       Object.assign(liveRepoConfiguration, loadedConfig)
     })
   }
@@ -205,43 +236,43 @@
         liveRepoConfiguration.defined.push(descriptor)
       }
     }
-    loadRecords(...importedIdentifiers)
+    loadRecord(...importedIdentifiers)
   }
 
   function recordFlushTick(): void {
-    for (const modifiedRecordId in recordFlushDelays) {
+    for (const modifiedRecordId in recordFlushTimers) {
       if (!modifiedRecords.has(modifiedRecordId)) {
-        delete recordFlushDelays[modifiedRecordId]
+        delete recordFlushTimers[modifiedRecordId]
       }
     }
     for (const modifiedRecordId of modifiedRecords) {
       if (liveRecordIssueCount[modifiedRecordId]) continue
-      if (recordFlushDelays[modifiedRecordId]) {
+      if (recordFlushTimers[modifiedRecordId]) {
         if (
           !recordDataIsEqual(
             $state.snapshot(liveRepoRecordsById[modifiedRecordId].metadata),
-            recordFlushDelays[modifiedRecordId].snapshot
+            recordFlushTimers[modifiedRecordId].snapshot
           )
         ) {
-          recordFlushDelays[modifiedRecordId].delay = flushDelay
-          recordFlushDelays[modifiedRecordId].snapshot = $state.snapshot(
+          recordFlushTimers[modifiedRecordId].delay = recordFlushInterval
+          recordFlushTimers[modifiedRecordId].snapshot = $state.snapshot(
             liveRepoRecordsById[modifiedRecordId].metadata
           )
-          recordFlushDelays[modifiedRecordId].flushing = false
+          recordFlushTimers[modifiedRecordId].flushing = false
         } else if (
-          recordFlushDelays[modifiedRecordId].delay <= 0 &&
-          !recordFlushDelays[modifiedRecordId].flushing
+          recordFlushTimers[modifiedRecordId].delay <= 0 &&
+          !recordFlushTimers[modifiedRecordId].flushing
         ) {
-          recordFlushDelays[modifiedRecordId].flushing = true
+          recordFlushTimers[modifiedRecordId].flushing = true
           flushRecord(modifiedRecordId)
         } else {
-          recordFlushDelays[modifiedRecordId].delay -= flushTickInterval
-          if (recordFlushDelays[modifiedRecordId].delay <= 0)
-            recordFlushDelays[modifiedRecordId].delay = 0
+          recordFlushTimers[modifiedRecordId].delay -= recordFlushTickInterval
+          if (recordFlushTimers[modifiedRecordId].delay <= 0)
+            recordFlushTimers[modifiedRecordId].delay = 0
         }
       } else {
-        recordFlushDelays[modifiedRecordId] = {
-          delay: flushDelay,
+        recordFlushTimers[modifiedRecordId] = {
+          delay: recordFlushInterval,
           snapshot: $state.snapshot(liveRepoRecordsById[modifiedRecordId].metadata),
           flushing: false
         }
@@ -249,15 +280,53 @@
     }
   }
 
+  function updateRecordDirStats(...identifiers: string[]): void {
+    retrievingRecordStats = true
+    // TODO check record locks
+    const promises = []
+    for (const identifier of identifiers) {
+      promises.push(
+        getRecordDirStats(appStateStore.state.openedRepoPath, identifier).then((recordDirStat) => {
+          if (
+            liveRecordStats[identifier] &&
+            liveRecordStats[identifier].lastModified < recordDirStat.lastModified
+          ) {
+            // TODO this is rather disorganized, and we should probably do this logic somewhere else.
+            loadRecord(identifier)
+          }
+          liveRecordStats[identifier] = recordDirStat
+        })
+      )
+    }
+    Promise.all(promises).then(() => {
+      retrievingRecordStats = false
+      recordStatTimer = recordStatInterval
+    })
+  }
+
+  function recordLockUpdateTick(): void {
+    recordStatTimer -= recordStatTickInterval
+    if (recordStatTimer <= 0) {
+      recordStatTimer = 0
+      if (!retrievingRecordStats) {
+        updateRecordDirStats(...Object.keys(liveRepoRecordsById))
+      }
+    }
+  }
+
   onMount(() => {
-    loadRepoConfiguration()
-    loadAllRecords()
-    flushIntervalTimerId = window.setInterval(recordFlushTick, flushTickInterval)
+    loadAppState().then(() => {
+      reloadRepoConfiguration()
+      reloadAllRecords()
+    })
+    flushIntervalTimerId = window.setInterval(recordFlushTick, recordFlushTickInterval)
+    recordLockUpdateTimerId = window.setInterval(recordLockUpdateTick, recordStatInterval)
   })
 
   function onWindowUnload(): void {
     flushAllModifiedRecords()
     window.clearInterval(flushIntervalTimerId)
+    window.clearInterval(recordLockUpdateTimerId)
   }
 </script>
 
@@ -275,19 +344,32 @@
   bind:open={editRepoConfigOpen}
   placement="right"
   onclose={() => {
-    setRepoConfig(localRepoPath, $state.snapshot(liveRepoConfiguration))
+    setRepoConfig(appStateStore.state.openedRepoPath, $state.snapshot(liveRepoConfiguration))
   }}
 >
   <ConfigureRepository bind:repoConfig={liveRepoConfiguration} />
 </Drawer>
 
-<Drawer bind:open={editRecordDataOpen} placement="right">
+<Drawer
+  bind:open={editRecordDataOpen}
+  placement="right"
+  onclose={() => {
+    let recordId = liveRepoRecords[editingLiveIndex].identifier
+    if (!modifiedRecords.has(liveRepoRecords[editingLiveIndex].identifier)) {
+      attemptUnlockRecord(appStateStore.state.openedRepoPath, recordId).then((success) => {
+        if (success) {
+          liveRecordStats[recordId].lockStatus = null
+        }
+      })
+    }
+  }}
+>
   <EditRecordData
     metadataDescriptors={liveMetadataDescriptors}
     bind:liveRecords={liveRepoRecords}
     bind:liveIssues={liveRecordIssues}
     bind:editRecordIndex={editingLiveIndex}
-    refreshRecordFn={loadRecords}
+    refreshRecordFn={loadRecord}
   />
 </Drawer>
 
@@ -322,15 +404,15 @@
         <TableHeadCell class="w-fit">
           {#if totalIssueCount}
             <ExclamationCircleOutline class="shrink-0" color="red" />
-            <Popover
-              >Validation failed for {Object.keys(liveRecordIssueCount).length} (unsaved) records</Popover
+            <Tooltip
+              >Validation failed for {Object.keys(liveRecordIssueCount).length} (unsaved) records</Tooltip
             >
-          {:else if modifiedRecords.size && Object.keys(recordFlushDelays).length}
+          {:else if modifiedRecords.size && Object.keys(recordFlushTimers).length}
             <FloppyDiskOutline class="shrink-0" />
-            <Popover>{modifiedRecords.size} records still pending saving...</Popover>
+            <Tooltip>{modifiedRecords.size} records still pending saving...</Tooltip>
           {:else}
             <ClipboardCheckOutline class="shrink-0" />
-            <Popover>Everything looks good and is saved!</Popover>
+            <Tooltip>Everything looks good and is saved!</Tooltip>
           {/if}
         </TableHeadCell>
         <TableHeadCell>Modify</TableHeadCell>
@@ -343,21 +425,20 @@
         {#each displayedRows as { identifier, metadata }, rowIndex (rowIndex)}
           <TableBodyRow class="border-gray-200">
             <TableBodyCell>
-              <!-- TODO fix the alignment issue here -->
               {#if liveRecordIssueCount[identifier]}
                 <ExclamationCircleOutline color="red" class="shrink-0" />
-                <Popover>
+                <Tooltip>
                   {liveRecordIssueCount[identifier]} issue(s) found with metadata associated with this
                   record. Updates will not be saved until fixed.
-                </Popover>
-              {:else if modifiedRecords.has(identifier) && recordFlushDelays[identifier]}
+                </Tooltip>
+              {:else if modifiedRecords.has(identifier) && recordFlushTimers[identifier]}
                 <FloppyDiskOutline color="primary" class="shrink-0" />
-                <Popover>
-                  Saving record in {recordFlushDelays[identifier].delay} seconds...
-                </Popover>
+                <Tooltip>
+                  Saving record in {(recordFlushTimers[identifier].delay / 1000).toFixed(1)} seconds...
+                </Tooltip>
               {:else}
                 <CheckCircleOutline class="shrink-0" color="green" />
-                <Popover>No issues found and record is saved on local storage.</Popover>
+                <Tooltip>No issues found and record is saved on local storage.</Tooltip>
               {/if}
             </TableBodyCell>
             <TableBodyCell>
@@ -371,7 +452,7 @@
               >
               <Tooltip>Edit Record Metadata</Tooltip>
               <Button
-                onclick={() => loadRecords(identifier)}
+                onclick={() => loadRecord(identifier)}
                 size="xs"
                 pill
                 outline
@@ -380,7 +461,8 @@
               >
               <Tooltip>Reload from Disk</Tooltip>
               <Button
-                onclick={() => openRepoRecordDirectory(localRepoPath, identifier)}
+                onclick={() =>
+                  openRepoRecordDirectory(appStateStore.state.openedRepoPath, identifier)}
                 size="xs"
                 pill
                 outline

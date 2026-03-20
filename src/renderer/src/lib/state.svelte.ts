@@ -38,6 +38,8 @@ export interface ProcessDescriptor {
   endTime: Date | null
 }
 
+export const LoadStatePromiseId = 'Load State'
+
 export const appStateStore: { state: AppState; promises: SvelteMap<string, PromiseDescriptor> } =
   $state({
     state: {
@@ -71,8 +73,20 @@ export function flush() {
   window['state'].flush('state', $state.snapshot(appStateStore).state)
 }
 
-export function load() {
-  window['state'].load('state', $state.snapshot(appStateStore).state).then((value) => {
-    Object.assign(appStateStore.state, value)
-  })
+export function loadAppState() {
+  if (appStateStore.promises.has(LoadStatePromiseId)) {
+    return getTrackedPromise(LoadStatePromiseId).promise
+  } else {
+    return trackPromise({
+      id: LoadStatePromiseId,
+      promise: window['state'].load('state', $state.snapshot(appStateStore).state).then((value) => {
+        Object.assign(appStateStore.state, value)
+        console.log($state.snapshot(appStateStore.state))
+      }),
+      startTime: new Date(),
+      title: 'Load App State',
+      endTime: null,
+      status: 'Loading app state from drive.'
+    }).promise
+  }
 }

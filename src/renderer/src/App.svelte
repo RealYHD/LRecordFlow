@@ -2,12 +2,8 @@
   import { Navbar, NavBrand, NavLi, NavUl, NavHamburger } from 'flowbite-svelte'
   import { Router } from 'sv-router'
   import { p } from './lib/router.svelte'
-  import { flush, load } from './lib/state.svelte'
-  import { onMount } from 'svelte'
-
-  onMount(() => {
-    load()
-  })
+  import { flush, loadAppState } from './lib/state.svelte'
+  loadAppState()
 </script>
 
 <svelte:window onbeforeunload={() => flush()} />

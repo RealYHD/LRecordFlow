@@ -1,15 +1,15 @@
 <script lang="ts">
   import { Button, Label, Select } from 'flowbite-svelte'
-  import {
-    importRepoRecordsFromTabular,
-    MetadataValueType,
-    type MetadataDescriptor,
-    type RepositoryRecord
-  } from '../lib/repo.svelte'
+  import { importRepoRecordsFromTabular } from '../lib/repo.svelte'
   import { selectSingleFileOfType } from '../lib/dialog.svelte'
   import { previewTabular } from '../lib/tabular.svelte'
   import ConfigureMetadataDescriptors from './ConfigureMetadataDescriptors.svelte'
   import { appStateStore, trackPromise } from '../lib/state.svelte'
+  import {
+    MetadataValueType,
+    type MetadataDescriptor,
+    type RepositoryRecord
+  } from '../../../common/types/models'
 
   let {
     definedMetadataDescriptors,
@@ -87,8 +87,6 @@
     })
     identifierCol = ''
   }
-
-  $inspect(duplicateIdentifiers)
 </script>
 
 <div>Import Records from Tabular</div>
