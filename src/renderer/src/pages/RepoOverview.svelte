@@ -14,7 +14,8 @@
     loadRecordFromRepo,
     getRecordDirStats,
     attemptLockRecord,
-    attemptUnlockRecord
+    attemptUnlockRecord,
+    recordExists
   } from '../lib/repo.svelte'
   import {
     Button,
@@ -34,6 +35,7 @@
   import EditRecordData from '../components/EditRecordData.svelte'
   import {
     AdjustmentsVerticalOutline,
+    ChalkboardUserOutline,
     CheckCircleOutline,
     ClipboardCheckOutline,
     EditOutline,
@@ -70,9 +72,9 @@
   )
 
   const recordFlushTickInterval = 1000
-  const recordFlushInterval = 2 * recordFlushTickInterval
-  const recordStatTickInterval = 1000
-  const recordStatInterval = 5 * recordStatTickInterval
+  const recordFlushInterval = 5 * recordFlushTickInterval
+  const recordStatTickInterval = 250
+  const recordStatInterval = 0.5 * recordStatTickInterval
   let recordStatTimer = $state(recordStatInterval)
   let retrievingRecordStats = $state(false)
   const liveRecordStats: Record<string, RecordDirStatus> = $state({})
@@ -87,17 +89,26 @@
   let flushIntervalTimerId = -1
   let recordLockUpdateTimerId = -1
 
-  const displayedRows: RepositoryRecord[] = $derived(liveRepoRecords) // TODO do something with this...
+  const displayedRecords: [RepositoryRecord, number][] = $derived(
+    liveRepoRecords.map((record, index) => [record, index])
+  ) // TODO do something with this...
   const displayedMetadata: MetadataDescriptor[] = $derived(liveMetadataDescriptors)
 
-  let liveRecordIssues = $derived(validateRecords(liveRepoRecords, liveMetadataDescriptors))
-  const liveRecordIssueCount = $derived(countIssues(liveRecordIssues))
-  let totalIssueCount: number = $derived(
-    Object.values(liveRecordIssueCount).reduce((total, current) => total + current, 0)
+  let displayedRecordIssues: Record<string, Record<string, string[]>> = $derived(
+    validateRecords(
+      displayedRecords.map(([record]) => record),
+      displayedMetadata
+    )
   )
-  let editRecordDataOpen = $state(false)
+  const displayedRecordIssueCount: Record<string, number> = $derived(
+    countIssues(displayedRecordIssues)
+  )
+  let totalDisplayedIssueCount: number = $derived(
+    Object.values(displayedRecordIssueCount).reduce((total, current) => total + current, 0)
+  )
+  let editRecordDataOpen: boolean = $state(false)
   let editingLiveIndex: number = $state(0)
-  let editRepoConfigOpen = $state(false)
+  let editRepoConfigOpen: boolean = $state(false)
 
   let importTabularOpen = $state(false)
 
@@ -118,7 +129,7 @@
     editingLiveIndex = liveRepoRecords.findLastIndex(
       (record) => record.identifier == createRecordIdentifier
     ) // probably O(1)?
-    editRecordDataOpen = true
+    editRecord(editingLiveIndex)
   }
 
   function editRecord(editRecordIndex: number): void {
@@ -186,21 +197,19 @@
 
   function flushAllModifiedRecords(): void {
     for (const modifiedRecordId of modifiedRecords) {
-      if (liveRecordIssueCount[modifiedRecordId]) continue
+      if (displayedRecordIssueCount[modifiedRecordId]) continue
       flushRecord(modifiedRecordId)
     }
   }
 
   function reloadAllRecords(): void {
     flushAllModifiedRecords()
-    console.log(appStateStore.state.openedRepoPath)
     getAllRecordsForRepo(appStateStore.state.openedRepoPath).then((identifiers) => {
       loadRecord(...identifiers)
     })
   }
 
   function loadRecord(...identifiers: string[]): void {
-    console.log('run')
     for (const identifier of identifiers) {
       loadRecordFromRepo(appStateStore.state.openedRepoPath, identifier).then((record) => {
         if (liveRepoRecordsById[identifier]) {
@@ -246,7 +255,7 @@
       }
     }
     for (const modifiedRecordId of modifiedRecords) {
-      if (liveRecordIssueCount[modifiedRecordId]) continue
+      if (displayedRecordIssueCount[modifiedRecordId]) continue
       if (recordFlushTimers[modifiedRecordId]) {
         if (
           !recordDataIsEqual(
@@ -285,6 +294,7 @@
     // TODO check record locks
     const promises = []
     for (const identifier of identifiers) {
+      if (!recordExists(appStateStore.state.openedRepoPath, identifier)) continue
       promises.push(
         getRecordDirStats(appStateStore.state.openedRepoPath, identifier).then((recordDirStat) => {
           if (
@@ -304,12 +314,12 @@
     })
   }
 
-  function recordLockUpdateTick(): void {
+  function recordDirStatsUpdateTick(): void {
     recordStatTimer -= recordStatTickInterval
     if (recordStatTimer <= 0) {
       recordStatTimer = 0
       if (!retrievingRecordStats) {
-        updateRecordDirStats(...Object.keys(liveRepoRecordsById))
+        updateRecordDirStats(...displayedRecords.map(([record]) => record.identifier))
       }
     }
   }
@@ -320,7 +330,7 @@
       reloadAllRecords()
     })
     flushIntervalTimerId = window.setInterval(recordFlushTick, recordFlushTickInterval)
-    recordLockUpdateTimerId = window.setInterval(recordLockUpdateTick, recordStatInterval)
+    recordLockUpdateTimerId = window.setInterval(recordDirStatsUpdateTick, recordStatInterval)
   })
 
   function onWindowUnload(): void {
@@ -367,7 +377,7 @@
   <EditRecordData
     metadataDescriptors={liveMetadataDescriptors}
     bind:liveRecords={liveRepoRecords}
-    bind:liveIssues={liveRecordIssues}
+    bind:liveIssues={displayedRecordIssues}
     bind:editRecordIndex={editingLiveIndex}
     refreshRecordFn={loadRecord}
   />
@@ -402,10 +412,10 @@
     <Table hoverable={true} border={true}>
       <TableHead class="normal-case">
         <TableHeadCell class="w-fit">
-          {#if totalIssueCount}
+          {#if totalDisplayedIssueCount}
             <ExclamationCircleOutline class="shrink-0" color="red" />
             <Tooltip
-              >Validation failed for {Object.keys(liveRecordIssueCount).length} (unsaved) records</Tooltip
+              >Validation failed for {Object.keys(displayedRecordIssueCount).length} (unsaved) records</Tooltip
             >
           {:else if modifiedRecords.size && Object.keys(recordFlushTimers).length}
             <FloppyDiskOutline class="shrink-0" />
@@ -415,26 +425,32 @@
             <Tooltip>Everything looks good and is saved!</Tooltip>
           {/if}
         </TableHeadCell>
-        <TableHeadCell>Modify</TableHeadCell>
+        <TableHeadCell>Edit</TableHeadCell>
         <TableHeadCell>Identifier</TableHeadCell>
         {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key } (key)}
           <TableHeadCell>{key}</TableHeadCell>
         {/each}
       </TableHead>
       <TableBody>
-        {#each displayedRows as { identifier, metadata }, rowIndex (rowIndex)}
+        {#each displayedRecords as [{ identifier, metadata }, liveRecordIndex] (liveRecordIndex)}
           <TableBodyRow class="border-gray-200">
             <TableBodyCell>
-              {#if liveRecordIssueCount[identifier]}
+              {#if displayedRecordIssueCount[identifier]}
                 <ExclamationCircleOutline color="red" class="shrink-0" />
                 <Tooltip>
-                  {liveRecordIssueCount[identifier]} issue(s) found with metadata associated with this
-                  record. Updates will not be saved until fixed.
+                  {displayedRecordIssueCount[identifier]} issue(s) found with metadata associated with
+                  this record. Updates will not be saved until fixed.
                 </Tooltip>
               {:else if modifiedRecords.has(identifier) && recordFlushTimers[identifier]}
                 <FloppyDiskOutline color="primary" class="shrink-0" />
                 <Tooltip>
                   Saving record in {(recordFlushTimers[identifier].delay / 1000).toFixed(1)} seconds...
+                </Tooltip>
+              {:else if liveRecordStats[identifier] && liveRecordStats[identifier].lockStatus}
+                <ChalkboardUserOutline />
+                <Tooltip>
+                  The record cannot be modified at this time as {liveRecordStats[identifier]
+                    .lockStatus.currentUser} is editing this record.
                 </Tooltip>
               {:else}
                 <CheckCircleOutline class="shrink-0" color="green" />
@@ -442,55 +458,58 @@
               {/if}
             </TableBodyCell>
             <TableBodyCell>
-              <Button
-                onclick={() => editRecord(rowIndex)}
-                size="xs"
-                class="p-2!"
-                pill
-                outline
-                color="primary"><EditOutline size="xs" /></Button
-              >
-              <Tooltip>Edit Record Metadata</Tooltip>
-              <Button
-                onclick={() => loadRecord(identifier)}
-                size="xs"
-                pill
-                outline
-                color="secondary"
-                class="p-2!"><RefreshOutline size="xs" /></Button
-              >
-              <Tooltip>Reload from Disk</Tooltip>
-              <Button
-                onclick={() =>
-                  openRepoRecordDirectory(appStateStore.state.openedRepoPath, identifier)}
-                size="xs"
-                pill
-                outline
-                color="secondary"
-                class="p-2!"
-              >
-                <FolderArrowRightOutline size="xs" />
-              </Button>
-              <Tooltip>Open Record Directory</Tooltip>
-              <Button
-                onclick={() => removeRecord(rowIndex)}
-                size="xs"
-                pill
-                outline
-                color="red"
-                class="p-2!"><TrashBinOutline size="xs" /></Button
-              >
-              <Tooltip>Delete Record</Tooltip>
+              <EditOutline />
+              <Popover>
+                <Button
+                  onclick={() => editRecord(liveRecordIndex)}
+                  size="xs"
+                  class="p-2!"
+                  pill
+                  outline
+                  color="primary"><EditOutline size="xs" /></Button
+                >
+                <Tooltip>Edit Record Metadata</Tooltip>
+                <Button
+                  onclick={() => loadRecord(identifier)}
+                  size="xs"
+                  pill
+                  outline
+                  color="secondary"
+                  class="p-2!"><RefreshOutline size="xs" /></Button
+                >
+                <Tooltip>Reload from Disk</Tooltip>
+                <Button
+                  onclick={() =>
+                    openRepoRecordDirectory(appStateStore.state.openedRepoPath, identifier)}
+                  size="xs"
+                  pill
+                  outline
+                  color="secondary"
+                  class="p-2!"
+                >
+                  <FolderArrowRightOutline size="xs" />
+                </Button>
+                <Tooltip>Open Record Directory</Tooltip>
+                <Button
+                  onclick={() => removeRecord(liveRecordIndex)}
+                  size="xs"
+                  pill
+                  outline
+                  color="red"
+                  class="p-2!"><TrashBinOutline size="xs" /></Button
+                >
+                <Tooltip>Delete Record</Tooltip>
+              </Popover>
             </TableBodyCell>
             <TableBodyCell>{identifier}</TableBodyCell>
             {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key }, colIndex (colIndex)}
               <TableBodyCell>
                 <div class="flex">
-                  {#if liveRecordIssues[identifier][key] && liveRecordIssues[identifier][key].length}
+                  {#if displayedRecordIssues[identifier][key] && displayedRecordIssues[identifier][key].length}
                     <ExclamationCircleOutline color="red" class="shrink-0" />
                     <Popover>
                       <ul>
-                        {#each liveRecordIssues[identifier][key] as issue (issue)}
+                        {#each displayedRecordIssues[identifier][key] as issue (issue)}
                           <li>{issue}</li>
                         {/each}
                       </ul>

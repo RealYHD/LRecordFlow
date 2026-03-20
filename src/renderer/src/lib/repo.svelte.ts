@@ -216,6 +216,13 @@ export function validateMetadataKey(key: string, repoConfig: RepositoryConfigura
   return issues
 }
 
+export async function recordExists(
+  localRepoPath: string,
+  recordIdentifier: string
+): Promise<boolean> {
+  return await window['repo'].recordExists(localRepoPath, recordIdentifier)
+}
+
 export async function openRepoRecordDirectory(localRepoPath: string, recordIdentifier: string) {
   return await window['repo'].openRepoRecordDirectory(localRepoPath, recordIdentifier)
 }
