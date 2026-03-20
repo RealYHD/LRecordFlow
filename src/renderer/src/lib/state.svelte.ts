@@ -48,22 +48,13 @@ export const appStateStore: { state: AppState; promises: SvelteMap<string, Promi
     promises: new SvelteMap()
   })
 
-export function trackPromise(
-  promiseDescriptor: PromiseDescriptor,
-  deleteOnComplete: boolean = true
-): PromiseDescriptor {
+export function trackPromise(promiseDescriptor: PromiseDescriptor): PromiseDescriptor {
   if (appStateStore.promises.has(promiseDescriptor.id)) {
     return appStateStore.promises.get(promiseDescriptor.id)
   }
-  if (deleteOnComplete) {
-    promiseDescriptor.promise.then(() => {
-      appStateStore.promises.delete(promiseDescriptor.id)
-    })
-  } else {
-    promiseDescriptor.promise.then(() => {
-      getTrackedPromise(promiseDescriptor.id).endTime = new Date()
-    })
-  }
+  promiseDescriptor.promise.then(() => {
+    getTrackedPromise(promiseDescriptor.id).endTime = new Date()
+  })
   appStateStore.promises.set(promiseDescriptor.id, promiseDescriptor)
   return appStateStore.promises.get(promiseDescriptor.id)
 }
@@ -74,11 +65,6 @@ export function getTrackedPromise(id: string) {
 
 export function stopTrackingPromise(id: string) {
   return appStateStore.promises.delete(id)
-}
-
-export function isTrackedPromiseComplete(id: string) {
-  if (!appStateStore.promises.has(id)) return true
-  return appStateStore.promises.get(id).endTime != null
 }
 
 export function flush() {

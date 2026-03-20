@@ -32,14 +32,9 @@ export async function repoHasPendingChanges(localRepoPath: string) {
   return (await simpleGit({ baseDir: localRepoPath }).status()).modified
 }
 
-export async function remoteSyncStatus(localRepoPath: string) {
-  let status = await simpleGit({ baseDir: localRepoPath }).fetch().status()
-  console.log(status.files.map((result) => result.path))
-  return {
-    ahead: status.ahead,
-    behind: status.behind,
-    filesChanged: status.files.map((result) => result.path)
-  }
+export async function repoIsSynced(localRepoPath: string) {
+  let gitStatus = await simpleGit({ baseDir: localRepoPath }).fetch().status()
+  return gitStatus.ahead == 0 && gitStatus.behind == 0
 }
 
 async function merge(localRepoPath: string, options: TaskOptions) {

@@ -15,9 +15,7 @@
     type RecordMetadata,
     type RepositoryRecord,
     getAllRecordsForRepo,
-    loadRecordFromRepo,
-    remoteSyncStatus,
-    syncPromiseId as gitFetchPromiseId
+    loadRecordFromRepo
   } from '../lib/repo.svelte'
   import {
     Button,
@@ -51,7 +49,7 @@
   import ConfigureRepository from '../components/ConfigureRepository.svelte'
   import { SvelteSet } from 'svelte/reactivity'
   import TabularImport from '../components/TabularRecordImport.svelte'
-  import { appStateStore, isTrackedPromiseComplete } from '../lib/state.svelte'
+  import { appStateStore } from '../lib/state.svelte'
 
   const localRepoPath = appStateStore.state.openedRepoPath
 
@@ -68,9 +66,7 @@
   )
 
   const flushDelay = 2 * 1000
-  const tickInterval = 1000
-  const remoteSyncDelay = 10000
-  let remoteSyncTimer = $state(remoteSyncDelay)
+  const flushTickInterval = 1000
   const persistedRecordMetadata: Record<string, RecordMetadata> = $state({})
   const modifiedRecords: SvelteSet<string> = $derived(
     calcModifiedRecords(liveRepoRecords, persistedRecordMetadata)
@@ -80,18 +76,10 @@
     { delay: number; flushing: boolean; snapshot: RecordMetadata }
   > = $state({})
   let flushIntervalTimerId = -1
-  let remoteSyncIntervalTimerId = -1
 
   const displayedRows: RepositoryRecord[] = $derived(liveRepoRecords) // TODO do something with this...
   const displayedMetadata: MetadataDescriptor[] = $derived(liveMetadataDescriptors)
 
-  let gitDistanceFromRemote: { ahead: number; behind: number; files: string[] } = $state({
-    ahead: 0,
-    behind: 0,
-    files: []
-  })
-  let syncingWithRemote: boolean = $derived(!isTrackedPromiseComplete(gitFetchPromiseId))
-  let remoteSyncIssues: string = $state('')
   let liveRecordIssues = $derived(validateRecords(liveRepoRecords, liveMetadataDescriptors))
   const liveRecordIssueCount = $derived(countIssues(liveRecordIssues))
   let totalIssueCount: number = $derived(
@@ -247,7 +235,7 @@
           recordFlushDelays[modifiedRecordId].flushing = true
           flushRecord(modifiedRecordId)
         } else {
-          recordFlushDelays[modifiedRecordId].delay -= tickInterval
+          recordFlushDelays[modifiedRecordId].delay -= flushTickInterval
           if (recordFlushDelays[modifiedRecordId].delay <= 0)
             recordFlushDelays[modifiedRecordId].delay = 0
         }
@@ -261,48 +249,15 @@
     }
   }
 
-  function remoteSyncTick(): void {
-    // TODO finish this
-    // Think about the non-git user experience
-    // Press save to commit and immediately try to push
-    // On fetch, if conflicts, show what is conflicting
-    // If no conflicts, automatically pull
-    // Rudimentary file browser
-    // Show diffs for files if possible
-    remoteSyncTimer -= tickInterval
-    if (remoteSyncTimer <= 0) {
-      remoteSyncTimer = 0
-      let promise = remoteSyncStatus(localRepoPath)
-      if (promise == null) return
-      promise
-        .then((distances) => {
-          gitDistanceFromRemote.ahead = distances.ahead
-          gitDistanceFromRemote.behind = distances.behind
-          gitDistanceFromRemote.files = distances.files
-          remoteSyncTimer = remoteSyncDelay
-        })
-        .catch((err) => {
-          // TODO improve type definitions for IPC processes
-          remoteSyncIssues = err.message
-        })
-    }
-  }
-
   onMount(() => {
     loadRepoConfiguration()
     loadAllRecords()
-    flushIntervalTimerId = window.setInterval(recordFlushTick, tickInterval)
-    remoteSyncIntervalTimerId = window.setInterval(remoteSyncTick, tickInterval)
+    flushIntervalTimerId = window.setInterval(recordFlushTick, flushTickInterval)
   })
 
   function onWindowUnload(): void {
     flushAllModifiedRecords()
-    if (flushIntervalTimerId != -1) {
-      window.clearInterval(flushIntervalTimerId)
-    }
-    if (remoteSyncIntervalTimerId != -1) {
-      window.clearInterval(remoteSyncIntervalTimerId)
-    }
+    window.clearInterval(flushIntervalTimerId)
   }
 </script>
 
@@ -360,8 +315,6 @@
       <AdjustmentsVerticalOutline />
       Settings
     </Button>
-    <Button outline color="secondary" onclick={() => {}}>Sync</Button>
-    <Popover>{gitDistanceFromRemote.ahead}</Popover>
   </div>
   <div>
     <Table hoverable={true} border={true}>
