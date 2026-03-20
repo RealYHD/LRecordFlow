@@ -54,6 +54,7 @@
   import type {
     MetadataDescriptor,
     RecordDirStatus,
+    RecordLockStatus,
     RecordMetadata,
     RepositoryConfiguration,
     RepositoryRecord
@@ -78,6 +79,7 @@
   let recordStatTimer = $state(recordStatInterval)
   let retrievingRecordStats = $state(false)
   const liveRecordStats: Record<string, RecordDirStatus> = $state({})
+
   const persistedRecordMetadata: Record<string, RecordMetadata> = $state({})
   const modifiedRecords: SvelteSet<string> = $derived(
     calcModifiedRecords(liveRepoRecords, persistedRecordMetadata)
@@ -93,6 +95,15 @@
     liveRepoRecords.map((record, index) => [record, index])
   ) // TODO do something with this...
   const displayedMetadata: MetadataDescriptor[] = $derived(liveMetadataDescriptors)
+
+  let recordLocks: Record<string, RecordLockStatus | undefined> = $derived(
+    Object.fromEntries(
+      displayedRecords.map(([record]) => [
+        record.identifier,
+        liveRecordStats[record.identifier] ? liveRecordStats[record.identifier].lockStatus : null
+      ])
+    )
+  )
 
   let displayedRecordIssues: Record<string, Record<string, string[]>> = $derived(
     validateRecords(
@@ -205,11 +216,11 @@
   function reloadAllRecords(): void {
     flushAllModifiedRecords()
     getAllRecordsForRepo(appStateStore.state.openedRepoPath).then((identifiers) => {
-      loadRecord(...identifiers)
+      reloadRecord(...identifiers)
     })
   }
 
-  function loadRecord(...identifiers: string[]): void {
+  function reloadRecord(...identifiers: string[]): void {
     for (const identifier of identifiers) {
       loadRecordFromRepo(appStateStore.state.openedRepoPath, identifier).then((record) => {
         if (liveRepoRecordsById[identifier]) {
@@ -245,7 +256,7 @@
         liveRepoConfiguration.defined.push(descriptor)
       }
     }
-    loadRecord(...importedIdentifiers)
+    reloadRecord(...importedIdentifiers)
   }
 
   function recordFlushTick(): void {
@@ -298,11 +309,12 @@
       promises.push(
         getRecordDirStats(appStateStore.state.openedRepoPath, identifier).then((recordDirStat) => {
           if (
-            liveRecordStats[identifier] &&
-            liveRecordStats[identifier].lastModified < recordDirStat.lastModified
+            (liveRecordStats[identifier] &&
+              liveRecordStats[identifier].lastModified < recordDirStat.lastModified) ||
+            !liveRecordStats[identifier]
           ) {
             // TODO this is rather disorganized, and we should probably do this logic somewhere else.
-            loadRecord(identifier)
+            reloadRecord(identifier)
           }
           liveRecordStats[identifier] = recordDirStat
         })
@@ -379,7 +391,7 @@
     bind:liveRecords={liveRepoRecords}
     bind:liveIssues={displayedRecordIssues}
     bind:editRecordIndex={editingLiveIndex}
-    refreshRecordFn={loadRecord}
+    refreshRecordFn={reloadRecord}
   />
 </Drawer>
 
@@ -446,8 +458,8 @@
                 <Tooltip>
                   Saving record in {(recordFlushTimers[identifier].delay / 1000).toFixed(1)} seconds...
                 </Tooltip>
-              {:else if liveRecordStats[identifier] && liveRecordStats[identifier].lockStatus}
-                <ChalkboardUserOutline />
+              {:else if recordLocks[identifier]}
+                <ChalkboardUserOutline color="cyan" />
                 <Tooltip>
                   The record cannot be modified at this time as {liveRecordStats[identifier]
                     .lockStatus.currentUser} is editing this record.
@@ -466,11 +478,12 @@
                   class="p-2!"
                   pill
                   outline
+                  disabled={recordLocks[identifier] != null}
                   color="primary"><EditOutline size="xs" /></Button
                 >
                 <Tooltip>Edit Record Metadata</Tooltip>
                 <Button
-                  onclick={() => loadRecord(identifier)}
+                  onclick={() => reloadRecord(identifier)}
                   size="xs"
                   pill
                   outline
@@ -486,6 +499,7 @@
                   outline
                   color="secondary"
                   class="p-2!"
+                  disabled={recordLocks[identifier] != null}
                 >
                   <FolderArrowRightOutline size="xs" />
                 </Button>
@@ -496,6 +510,7 @@
                   pill
                   outline
                   color="red"
+                  disabled={recordLocks[identifier] != null}
                   class="p-2!"><TrashBinOutline size="xs" /></Button
                 >
                 <Tooltip>Delete Record</Tooltip>
