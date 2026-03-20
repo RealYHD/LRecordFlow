@@ -10,14 +10,11 @@
     setRepoConfig,
     validateRecordIdentifier,
     validateRecords,
-    type MetadataDescriptor,
-    type RepositoryConfiguration,
-    type RecordMetadata,
-    type RepositoryRecord,
     getAllRecordsForRepo,
     loadRecordFromRepo,
-    isRecordLocked,
-    type RecordLockStatus
+    getRecordDirStats,
+    attemptLockRecord,
+    attemptUnlockRecord
   } from '../lib/repo.svelte'
   import {
     Button,
@@ -52,6 +49,13 @@
   import { SvelteSet } from 'svelte/reactivity'
   import TabularImport from '../components/TabularRecordImport.svelte'
   import { appStateStore, loadAppState } from '../lib/state.svelte'
+  import type {
+    MetadataDescriptor,
+    RecordDirStatus,
+    RecordMetadata,
+    RepositoryConfiguration,
+    RepositoryRecord
+  } from '../../../common/types/models'
 
   let liveRepoConfiguration: RepositoryConfiguration = $state({
     defined: [],
@@ -67,11 +71,11 @@
 
   const recordFlushTickInterval = 1000
   const recordFlushInterval = 2 * recordFlushTickInterval
-  const recordLockUpdateTickInterval = 1000
-  const recordLockUpdateInterval = 5 * recordLockUpdateTickInterval
-  let recordLockUpdateTimer = $state(recordLockUpdateInterval)
-  let lockUpdating = $state(false)
-  let liveRecordLockStatuses: Record<string, RecordLockStatus> = $state({})
+  const recordStatTickInterval = 1000
+  const recordStatInterval = 5 * recordStatTickInterval
+  let recordStatTimer = $state(recordStatInterval)
+  let retrievingRecordStats = $state(false)
+  const liveRecordStats: Record<string, RecordDirStatus> = $state({})
   const persistedRecordMetadata: Record<string, RecordMetadata> = $state({})
   const modifiedRecords: SvelteSet<string> = $derived(
     calcModifiedRecords(liveRepoRecords, persistedRecordMetadata)
@@ -119,7 +123,14 @@
 
   function editRecord(editRecordIndex: number): void {
     editingLiveIndex = editRecordIndex
-    editRecordDataOpen = true
+    let recordIdentifier = liveRepoRecords[editRecordIndex].identifier
+    attemptLockRecord(appStateStore.state.openedRepoPath, recordIdentifier).then((success) => {
+      if (success) {
+        editRecordDataOpen = true
+      } else {
+        // TODO display error message :)
+      }
+    })
   }
 
   function removeRecord(deleteRecordIndex: number): void {
@@ -158,6 +169,11 @@
       delete recordFlushTimers[modifiedRecord.identifier]
       modifiedRecords.delete(modifiedRecord.identifier)
       persistedRecordMetadata[modifiedRecord.identifier] = $state.snapshot(modifiedRecord.metadata)
+      attemptUnlockRecord(appStateStore.state.openedRepoPath, recordIdentifier).then((success) => {
+        if (success) {
+          liveRecordStats[recordIdentifier].lockStatus = null
+        }
+      })
     })
   }
 
@@ -172,11 +188,11 @@
     flushAllModifiedRecords()
     console.log(appStateStore.state.openedRepoPath)
     getAllRecordsForRepo(appStateStore.state.openedRepoPath).then((identifiers) => {
-      loadRecords(...identifiers)
+      loadRecord(...identifiers)
     })
   }
 
-  function loadRecords(...identifiers: string[]): void {
+  function loadRecord(...identifiers: string[]): void {
     console.log('run')
     for (const identifier of identifiers) {
       loadRecordFromRepo(appStateStore.state.openedRepoPath, identifier).then((record) => {
@@ -213,7 +229,7 @@
         liveRepoConfiguration.defined.push(descriptor)
       }
     }
-    loadRecords(...importedIdentifiers)
+    loadRecord(...importedIdentifiers)
   }
 
   function recordFlushTick(): void {
@@ -257,29 +273,36 @@
     }
   }
 
-  function updateRecordLocks(...identifiers: string[]): void {
-    lockUpdating = true
+  function updateRecordDirStats(...identifiers: string[]): void {
+    retrievingRecordStats = true
     // TODO check record locks
-    let promises = []
+    const promises = []
     for (const identifier of identifiers) {
       promises.push(
-        isRecordLocked(appStateStore.state.openedRepoPath, identifier).then((recordLockStatus) => {
-          liveRecordLockStatuses[identifier] = recordLockStatus
+        getRecordDirStats(appStateStore.state.openedRepoPath, identifier).then((recordDirStat) => {
+          if (
+            liveRecordStats[identifier] &&
+            liveRecordStats[identifier].lastModified < recordDirStat.lastModified
+          ) {
+            // TODO this is rather disorganized, and we should probably do this logic somewhere else.
+            loadRecord(identifier)
+          }
+          liveRecordStats[identifier] = recordDirStat
         })
       )
     }
     Promise.all(promises).then(() => {
-      lockUpdating = false
-      recordLockUpdateTimer = recordLockUpdateInterval
+      retrievingRecordStats = false
+      recordStatTimer = recordStatInterval
     })
   }
 
   function recordLockUpdateTick(): void {
-    recordLockUpdateTimer -= recordLockUpdateTickInterval
-    if (recordLockUpdateTimer <= 0) {
-      recordLockUpdateTimer = 0
-      if (!lockUpdating) {
-        updateRecordLocks(...Object.keys(liveRepoRecordsById))
+    recordStatTimer -= recordStatTickInterval
+    if (recordStatTimer <= 0) {
+      recordStatTimer = 0
+      if (!retrievingRecordStats) {
+        updateRecordDirStats(...Object.keys(liveRepoRecordsById))
       }
     }
   }
@@ -290,7 +313,7 @@
       reloadAllRecords()
     })
     flushIntervalTimerId = window.setInterval(recordFlushTick, recordFlushTickInterval)
-    recordLockUpdateTimerId = window.setInterval(recordLockUpdateTick, recordLockUpdateInterval)
+    recordLockUpdateTimerId = window.setInterval(recordLockUpdateTick, recordStatInterval)
   })
 
   function onWindowUnload(): void {
@@ -320,13 +343,26 @@
   <ConfigureRepository bind:repoConfig={liveRepoConfiguration} />
 </Drawer>
 
-<Drawer bind:open={editRecordDataOpen} placement="right">
+<Drawer
+  bind:open={editRecordDataOpen}
+  placement="right"
+  onclose={() => {
+    let recordId = liveRepoRecords[editingLiveIndex].identifier
+    if (!modifiedRecords.has(liveRepoRecords[editingLiveIndex].identifier)) {
+      attemptUnlockRecord(appStateStore.state.openedRepoPath, recordId).then((success) => {
+        if (success) {
+          liveRecordStats[recordId].lockStatus = null
+        }
+      })
+    }
+  }}
+>
   <EditRecordData
     metadataDescriptors={liveMetadataDescriptors}
     bind:liveRecords={liveRepoRecords}
     bind:liveIssues={liveRecordIssues}
     bind:editRecordIndex={editingLiveIndex}
-    refreshRecordFn={loadRecords}
+    refreshRecordFn={loadRecord}
   />
 </Drawer>
 
@@ -361,15 +397,15 @@
         <TableHeadCell class="w-fit">
           {#if totalIssueCount}
             <ExclamationCircleOutline class="shrink-0" color="red" />
-            <Popover
-              >Validation failed for {Object.keys(liveRecordIssueCount).length} (unsaved) records</Popover
+            <Tooltip
+              >Validation failed for {Object.keys(liveRecordIssueCount).length} (unsaved) records</Tooltip
             >
           {:else if modifiedRecords.size && Object.keys(recordFlushTimers).length}
             <FloppyDiskOutline class="shrink-0" />
-            <Popover>{modifiedRecords.size} records still pending saving...</Popover>
+            <Tooltip>{modifiedRecords.size} records still pending saving...</Tooltip>
           {:else}
             <ClipboardCheckOutline class="shrink-0" />
-            <Popover>Everything looks good and is saved!</Popover>
+            <Tooltip>Everything looks good and is saved!</Tooltip>
           {/if}
         </TableHeadCell>
         <TableHeadCell>Modify</TableHeadCell>
@@ -384,18 +420,18 @@
             <TableBodyCell>
               {#if liveRecordIssueCount[identifier]}
                 <ExclamationCircleOutline color="red" class="shrink-0" />
-                <Popover>
+                <Tooltip>
                   {liveRecordIssueCount[identifier]} issue(s) found with metadata associated with this
                   record. Updates will not be saved until fixed.
-                </Popover>
+                </Tooltip>
               {:else if modifiedRecords.has(identifier) && recordFlushTimers[identifier]}
                 <FloppyDiskOutline color="primary" class="shrink-0" />
-                <Popover>
+                <Tooltip>
                   Saving record in {(recordFlushTimers[identifier].delay / 1000).toFixed(1)} seconds...
-                </Popover>
+                </Tooltip>
               {:else}
                 <CheckCircleOutline class="shrink-0" color="green" />
-                <Popover>No issues found and record is saved on local storage.</Popover>
+                <Tooltip>No issues found and record is saved on local storage.</Tooltip>
               {/if}
             </TableBodyCell>
             <TableBodyCell>
@@ -409,7 +445,7 @@
               >
               <Tooltip>Edit Record Metadata</Tooltip>
               <Button
-                onclick={() => loadRecords(identifier)}
+                onclick={() => loadRecord(identifier)}
                 size="xs"
                 pill
                 outline

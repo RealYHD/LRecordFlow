@@ -1,38 +1,12 @@
 import { appStateStore } from './state.svelte'
-
-export type RepositoryRecord = {
-  identifier: string
-  metadata: RecordMetadata
-  files: string[]
-}
-
-export type RecordMetadata = Record<string, string>
-
-export enum MetadataValueType {
-  Options = 'options',
-  Date = 'date',
-  Number = 'number',
-  Text = 'text',
-  File = 'file'
-}
-
-export interface RecordLockStatus {
-  currentUser: string | null
-  lockDate: Date | null
-}
-
-export interface MetadataDescriptor {
-  key: string
-  value: {
-    valueType: MetadataValueType
-    options: string[]
-  }
-  required: boolean
-}
-export interface RepositoryConfiguration {
-  defined: MetadataDescriptor[]
-  exactKeys: boolean
-}
+import {
+  MetadataValueType,
+  type MetadataDescriptor,
+  type RecordDirStatus,
+  type RecordMetadata,
+  type RepositoryConfiguration,
+  type RepositoryRecord
+} from '../../../common/types/models'
 
 export function recordDataIsEqual(record1: RecordMetadata, record2: RecordMetadata) {
   if (record1 == record2) return true
@@ -188,22 +162,22 @@ export function countIssues(recordIssues: Record<string, Record<string, string[]
 export async function attemptLockRecord(
   localRepoPath: string,
   recordIdentifier: string
-): Promise<RecordLockStatus> {
+): Promise<boolean> {
   return await window['repo'].attemptLockRecord(localRepoPath, recordIdentifier)
 }
 
 export async function attemptUnlockRecord(
   localRepoPath: string,
   recordIdentifier: string
-): Promise<void> {
+): Promise<boolean> {
   return await window['repo'].attemptUnlockRecord(localRepoPath, recordIdentifier)
 }
 
-export async function isRecordLocked(
+export async function getRecordDirStats(
   localRepoPath: string,
   recordIdentifier: string
-): Promise<RecordLockStatus> {
-  return await window['repo'].isRecordLocked(localRepoPath, recordIdentifier)
+): Promise<RecordDirStatus> {
+  return await window['repo'].getRecordDirStats(localRepoPath, recordIdentifier)
 }
 
 export function validateRecordIdentifier(identifier: string, allIdentifiers: string[]) {

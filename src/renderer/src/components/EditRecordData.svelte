@@ -16,7 +16,7 @@
     MetadataValueType,
     type MetadataDescriptor,
     type RepositoryRecord
-  } from '../lib/repo.svelte'
+  } from '../../../common/types/models'
 
   let {
     metadataDescriptors,

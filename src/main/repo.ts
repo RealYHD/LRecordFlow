@@ -6,6 +6,7 @@ import Papa from 'papaparse'
 import { createReadStream } from 'fs'
 import { check, lock, unlock } from 'proper-lockfile'
 import { userInfo } from 'os'
+import { RecordDirStatus, RecordLockStatus } from '../common/types/models'
 
 const recordMetadataFilename = '.lrf.record.json'
 const repoConfigurationFilename = '.lrf.config.json'
@@ -88,7 +89,7 @@ export async function recordExists(
 export async function attemptLockRecord(
   localRepoPath: string,
   recordIdentifier: string
-): Promise<{ currentUser: string; lockDate: Date }> {
+): Promise<boolean> {
   let recordPath = path.join(localRepoPath, recordIdentifier)
   let recordLockInfoPath = path.join(localRepoPath, recordIdentifier, recordLockInfo)
   let lockInfo = {
@@ -98,11 +99,11 @@ export async function attemptLockRecord(
   try {
     await lock(recordPath)
     await writeFile(recordLockInfoPath, JSON.stringify(lockInfo))
-    return lockInfo
+    return true
   } catch (error) {
     // TODO check if it exists, if not, return generic message
     // TODO check if it's the same user as the one currently trying to edit (indicates multiple instances of the software is open)
-    return JSON.parse(await readFile(recordLockInfoPath, 'utf-8'))
+    return false
   }
 }
 
@@ -110,27 +111,30 @@ export async function attemptUnlockRecord(localRepoPath: string, recordIdentifie
   let recordPath = path.join(localRepoPath, recordIdentifier)
   let recordLockInfoPath = path.join(localRepoPath, recordIdentifier, recordLockInfo)
   try {
-    await rm(recordLockInfoPath, { force: true })
     await unlock(recordPath)
+    await rm(recordLockInfoPath, { force: true })
+    return true
   } catch (error) {
     if (await check(recordPath)) {
       throw error
     } else {
-      return
+      return false
     }
   }
 }
 
-export async function isRecordLocked(
+export async function getRecordDirStats(
   localRepoPath: string,
   recordIdentifier: string
-): Promise<{ currentUser: string | null; lockDate: Date | null }> {
+): Promise<RecordDirStatus> {
   let recordPath = path.join(localRepoPath, recordIdentifier)
   let recordLockInfoPath = path.join(localRepoPath, recordIdentifier, recordLockInfo)
+  let lastModifiedTime = (await stat(recordPath)).mtime
   if (await check(recordPath)) {
-    return JSON.parse(await readFile(recordLockInfoPath, 'utf-8'))
+    let lockStatus: RecordLockStatus = JSON.parse(await readFile(recordLockInfoPath, 'utf-8'))
+    return { lastModified: lastModifiedTime, lockStatus: lockStatus }
   } else {
-    return { currentUser: null, lockDate: null }
+    return { lastModified: lastModifiedTime, lockStatus: null }
   }
 }
 

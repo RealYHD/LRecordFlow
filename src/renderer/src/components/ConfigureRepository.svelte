@@ -1,13 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import {
-    MetadataValueType,
-    validateMetadataKey,
-    type RepositoryConfiguration
-  } from '../lib/repo.svelte'
+  import { validateMetadataKey } from '../lib/repo.svelte'
   import { Button, ButtonGroup, Input, Label, Span } from 'flowbite-svelte'
   import { PlusOutline } from 'flowbite-svelte-icons'
   import ConfigureMetadataDescriptors from './ConfigureMetadataDescriptors.svelte'
+  import { MetadataValueType, type RepositoryConfiguration } from '../../../common/types/models'
 
   const {
     repoConfig = $bindable()
@@ -54,6 +51,8 @@
             bind:metadataDescriptors={repoConfig.defined}
             valueExamples={null}
             maxExamples={10}
+            hideMetadataKeys={[]}
+            metadataIssues={{}}
           />
         {:else}
           <Span class="mx-auto py-5 px-3">No metadata associated with this record yet!</Span>
