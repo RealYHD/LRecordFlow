@@ -88,19 +88,49 @@ export async function recordExists(
 export async function attemptLockRecord(
   localRepoPath: string,
   recordIdentifier: string
-): Promise<null | { currentUser: string }> {
+): Promise<{ currentUser: string; lockDate: Date }> {
   let recordPath = path.join(localRepoPath, recordIdentifier)
   let recordLockInfoPath = path.join(localRepoPath, recordIdentifier, recordLockInfo)
   let lockInfo = {
-    currentUser: userInfo().username
+    currentUser: userInfo().username,
+    lockDate: new Date()
   }
   try {
     await lock(recordPath)
-    // TODO write record lock information
-    return null
+    await writeFile(recordLockInfoPath, JSON.stringify(lockInfo))
+    return lockInfo
   } catch (error) {
     // TODO check if it exists, if not, return generic message
+    // TODO check if it's the same user as the one currently trying to edit (indicates multiple instances of the software is open)
     return JSON.parse(await readFile(recordLockInfoPath, 'utf-8'))
+  }
+}
+
+export async function attemptUnlockRecord(localRepoPath: string, recordIdentifier: string) {
+  let recordPath = path.join(localRepoPath, recordIdentifier)
+  let recordLockInfoPath = path.join(localRepoPath, recordIdentifier, recordLockInfo)
+  try {
+    await rm(recordLockInfoPath, { force: true })
+    await unlock(recordPath)
+  } catch (error) {
+    if (await check(recordPath)) {
+      throw error
+    } else {
+      return
+    }
+  }
+}
+
+export async function isRecordLocked(
+  localRepoPath: string,
+  recordIdentifier: string
+): Promise<{ currentUser: string | null; lockDate: Date | null }> {
+  let recordPath = path.join(localRepoPath, recordIdentifier)
+  let recordLockInfoPath = path.join(localRepoPath, recordIdentifier, recordLockInfo)
+  if (await check(recordPath)) {
+    return JSON.parse(await readFile(recordLockInfoPath, 'utf-8'))
+  } else {
+    return { currentUser: null, lockDate: null }
   }
 }
 

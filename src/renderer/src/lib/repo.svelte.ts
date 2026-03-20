@@ -16,6 +16,11 @@ export enum MetadataValueType {
   File = 'file'
 }
 
+export interface RecordLockStatus {
+  currentUser: string | null
+  lockDate: Date | null
+}
+
 export interface MetadataDescriptor {
   key: string
   value: {
@@ -180,6 +185,27 @@ export function countIssues(recordIssues: Record<string, Record<string, string[]
   return issueCount
 }
 
+export async function attemptLockRecord(
+  localRepoPath: string,
+  recordIdentifier: string
+): Promise<RecordLockStatus> {
+  return await window['repo'].attemptLockRecord(localRepoPath, recordIdentifier)
+}
+
+export async function attemptUnlockRecord(
+  localRepoPath: string,
+  recordIdentifier: string
+): Promise<void> {
+  return await window['repo'].attemptUnlockRecord(localRepoPath, recordIdentifier)
+}
+
+export async function isRecordLocked(
+  localRepoPath: string,
+  recordIdentifier: string
+): Promise<RecordLockStatus> {
+  return await window['repo'].isRecordLocked(localRepoPath, recordIdentifier)
+}
+
 export function validateRecordIdentifier(identifier: string, allIdentifiers: string[]) {
   // TODO validate that it is a valid path
   if (identifier.trim().length <= 0) {
@@ -237,4 +263,3 @@ export async function importRepoRecordsFromTabular(
     pathColumns
   )
 }
-// TODO Currently, this overwrites... Maybe we should add a feature to check for overwrites
