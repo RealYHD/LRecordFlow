@@ -169,11 +169,18 @@
       delete recordFlushTimers[modifiedRecord.identifier]
       modifiedRecords.delete(modifiedRecord.identifier)
       persistedRecordMetadata[modifiedRecord.identifier] = $state.snapshot(modifiedRecord.metadata)
-      attemptUnlockRecord(appStateStore.state.openedRepoPath, recordIdentifier).then((success) => {
-        if (success) {
-          liveRecordStats[recordIdentifier].lockStatus = null
-        }
-      })
+      if (
+        !editRecordDataOpen ||
+        liveRepoRecords[editingLiveIndex].identifier != modifiedRecord.identifier
+      ) {
+        attemptUnlockRecord(appStateStore.state.openedRepoPath, recordIdentifier).then(
+          (success) => {
+            if (success) {
+              liveRecordStats[recordIdentifier].lockStatus = null
+            }
+          }
+        )
+      }
     })
   }
 
