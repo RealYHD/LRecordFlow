@@ -38,6 +38,7 @@
     ChalkboardUserOutline,
     CheckCircleOutline,
     ClipboardCheckOutline,
+    DotsVerticalOutline,
     EditOutline,
     ExclamationCircleOutline,
     FloppyDiskOutline,
@@ -141,6 +142,7 @@
       (record) => record.identifier == createRecordIdentifier
     ) // probably O(1)?
     editRecord(editingLiveIndex)
+    editRecordDataOpen = true
   }
 
   function editRecord(editRecordIndex: number): void {
@@ -305,20 +307,25 @@
     // TODO check record locks
     const promises = []
     for (const identifier of identifiers) {
-      if (!recordExists(appStateStore.state.openedRepoPath, identifier)) continue
-      promises.push(
-        getRecordDirStats(appStateStore.state.openedRepoPath, identifier).then((recordDirStat) => {
-          if (
-            (liveRecordStats[identifier] &&
-              liveRecordStats[identifier].lastModified < recordDirStat.lastModified) ||
-            !liveRecordStats[identifier]
-          ) {
-            // TODO this is rather disorganized, and we should probably do this logic somewhere else.
-            reloadRecord(identifier)
-          }
-          liveRecordStats[identifier] = recordDirStat
-        })
-      )
+      recordExists(appStateStore.state.openedRepoPath, identifier).then((recordExists) => {
+        if (recordExists) {
+          promises.push(
+            getRecordDirStats(appStateStore.state.openedRepoPath, identifier).then(
+              (recordDirStat) => {
+                if (
+                  (liveRecordStats[identifier] &&
+                    liveRecordStats[identifier].lastModified < recordDirStat.lastModified) ||
+                  !liveRecordStats[identifier]
+                ) {
+                  // TODO this is rather disorganized, and we should probably do this logic somewhere else.
+                  reloadRecord(identifier)
+                }
+                liveRecordStats[identifier] = recordDirStat
+              }
+            )
+          )
+        }
+      })
     }
     Promise.all(promises).then(() => {
       retrievingRecordStats = false
@@ -421,7 +428,7 @@
     </Button>
   </div>
   <div>
-    <Table hoverable={true} border={true}>
+    <Table hoverable={true} border={true} class="table-auto">
       <TableHead class="normal-case">
         <TableHeadCell class="w-fit">
           {#if totalDisplayedIssueCount}
@@ -437,11 +444,11 @@
             <Tooltip>Everything looks good and is saved!</Tooltip>
           {/if}
         </TableHeadCell>
-        <TableHeadCell>Edit</TableHeadCell>
         <TableHeadCell>Identifier</TableHeadCell>
         {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key } (key)}
           <TableHeadCell>{key}</TableHeadCell>
         {/each}
+        <TableHeadCell></TableHeadCell>
       </TableHead>
       <TableBody>
         {#each displayedRecords as [{ identifier, metadata }, liveRecordIndex] (liveRecordIndex)}
@@ -466,12 +473,32 @@
                 </Tooltip>
               {:else}
                 <CheckCircleOutline class="shrink-0" color="green" />
-                <Tooltip>No issues found and record is saved on local storage.</Tooltip>
+                <Tooltip>No issues found and record is saved.</Tooltip>
               {/if}
             </TableBodyCell>
+            <TableBodyCell>{identifier}</TableBodyCell>
+            {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key }, colIndex (colIndex)}
+              <TableBodyCell>
+                <div class="flex">
+                  {#if displayedRecordIssues[identifier][key] && displayedRecordIssues[identifier][key].length}
+                    <ExclamationCircleOutline color="red" class="shrink-0" />
+                    <Popover>
+                      <ul>
+                        {#each displayedRecordIssues[identifier][key] as issue (issue)}
+                          <li>{issue}</li>
+                        {/each}
+                      </ul>
+                    </Popover>
+                  {/if}
+                  {metadata[key]}
+                </div>
+              </TableBodyCell>
+            {/each}
             <TableBodyCell>
-              <EditOutline />
-              <Popover>
+              <Button outline size="sm" class="border-0 p-1!" color="dark">
+                <DotsVerticalOutline />
+              </Button>
+              <Popover trigger="click">
                 <Button
                   onclick={() => editRecord(liveRecordIndex)}
                   size="xs"
@@ -516,24 +543,6 @@
                 <Tooltip>Delete Record</Tooltip>
               </Popover>
             </TableBodyCell>
-            <TableBodyCell>{identifier}</TableBodyCell>
-            {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key }, colIndex (colIndex)}
-              <TableBodyCell>
-                <div class="flex">
-                  {#if displayedRecordIssues[identifier][key] && displayedRecordIssues[identifier][key].length}
-                    <ExclamationCircleOutline color="red" class="shrink-0" />
-                    <Popover>
-                      <ul>
-                        {#each displayedRecordIssues[identifier][key] as issue (issue)}
-                          <li>{issue}</li>
-                        {/each}
-                      </ul>
-                    </Popover>
-                  {/if}
-                  {metadata[key]}
-                </div>
-              </TableBodyCell>
-            {/each}
           </TableBodyRow>
         {/each}
       </TableBody>

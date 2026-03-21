@@ -81,7 +81,6 @@ export function loadAppState() {
       id: LoadStatePromiseId,
       promise: window['state'].load('state', $state.snapshot(appStateStore).state).then((value) => {
         Object.assign(appStateStore.state, value)
-        console.log($state.snapshot(appStateStore.state))
       }),
       startTime: new Date(),
       title: 'Load App State',
