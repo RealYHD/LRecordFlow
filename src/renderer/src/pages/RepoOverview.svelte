@@ -18,6 +18,7 @@
     recordExists
   } from '../lib/repo.svelte'
   import {
+    Badge,
     Button,
     ButtonGroup,
     Drawer,
@@ -41,6 +42,7 @@
     DotsVerticalOutline,
     EditOutline,
     ExclamationCircleOutline,
+    FilterOutline,
     FloppyDiskOutline,
     FolderArrowRightOutline,
     PlusOutline,
@@ -52,14 +54,19 @@
   import { SvelteSet } from 'svelte/reactivity'
   import TabularImport from '../components/TabularRecordImport.svelte'
   import { appStateStore, loadAppState } from '../lib/state.svelte'
-  import type {
-    MetadataDescriptor,
-    RecordDirStatus,
-    RecordLockStatus,
-    RecordMetadata,
-    RepositoryConfiguration,
-    RepositoryRecord
+  import {
+    MetadataValueType,
+    type MetadataDescriptor,
+    type RecordDirStatus,
+    type RecordLockStatus,
+    type RecordMetadata,
+    type RepositoryConfiguration,
+    type RepositoryRecord,
+    type RepositoryRecordFilter
   } from '../../../common/types/models'
+  import TextRecordFilterBuilder from '../components/TextRecordFilterBuilder.svelte'
+  import DateRecordFilterBuilder from '../components/DateRecordFilterBuilder.svelte'
+  import NumberRecordFilterBuilder from '../components/NumberRecordFilterBuilder.svelte'
 
   let liveRepoConfiguration: RepositoryConfiguration = $state({
     defined: [],
@@ -73,6 +80,8 @@
     Object.fromEntries(liveRepoRecords.map((recordData) => [recordData.identifier, recordData]))
   )
 
+  let flushIntervalTimerId = -1
+  let recordLockUpdateTimerId = -1
   const recordFlushTickInterval = 1000
   const recordFlushInterval = 5 * recordFlushTickInterval
   const recordStatTickInterval = 250
@@ -80,7 +89,6 @@
   let recordStatTimer = $state(recordStatInterval)
   let retrievingRecordStats = $state(false)
   const liveRecordStats: Record<string, RecordDirStatus> = $state({})
-
   const persistedRecordMetadata: Record<string, RecordMetadata> = $state({})
   const modifiedRecords: SvelteSet<string> = $derived(
     calcModifiedRecords(liveRepoRecords, persistedRecordMetadata)
@@ -89,26 +97,38 @@
     string,
     { delay: number; flushing: boolean; snapshot: RecordMetadata }
   > = $state({})
-  let flushIntervalTimerId = -1
-  let recordLockUpdateTimerId = -1
-
-  const displayedRecords: [RepositoryRecord, number][] = $derived(
-    liveRepoRecords.map((record, index) => [record, index])
+  let liveRecordFilters: Record<string, Record<string, RepositoryRecordFilter>> = $state({})
+  let transientRecordFilters: Record<string, RepositoryRecordFilter> = $state({})
+  const displayedRecords: { record: RepositoryRecord; index: number }[] = $derived(
+    liveRepoRecords
+      .map((record, index) => ({ record: record, index: index }))
+      .filter(({ record }) => {
+        for (const metadataKey in liveRecordFilters) {
+          const metadataFilters = liveRecordFilters[metadataKey]
+          let passed = false
+          for (const filterName in metadataFilters) {
+            const filter = metadataFilters[filterName]
+            let currentFilterPassed = filter.predicate(record.metadata[metadataKey])
+            passed = currentFilterPassed ? true : passed
+            if (filter.must && !currentFilterPassed) return false
+          }
+          if (!passed) return false // all or nothing through the columns
+        }
+        return true
+      })
   ) // TODO do something with this...
   const displayedMetadata: MetadataDescriptor[] = $derived(liveMetadataDescriptors)
-
   let recordLocks: Record<string, RecordLockStatus | undefined> = $derived(
     Object.fromEntries(
-      displayedRecords.map(([record]) => [
+      displayedRecords.map(({ record }) => [
         record.identifier,
         liveRecordStats[record.identifier] ? liveRecordStats[record.identifier].lockStatus : null
       ])
     )
   )
-
   let displayedRecordIssues: Record<string, Record<string, string[]>> = $derived(
     validateRecords(
-      displayedRecords.map(([record]) => record),
+      displayedRecords.map(({ record }) => record),
       displayedMetadata
     )
   )
@@ -333,12 +353,27 @@
     })
   }
 
+  function addFilterForMetadataKey(
+    recordMetadataKey: string,
+    filter: RepositoryRecordFilter
+  ): void {
+    if (!liveRecordFilters[recordMetadataKey]) liveRecordFilters[recordMetadataKey] = {}
+    liveRecordFilters[recordMetadataKey][filter.filterName] = filter
+  }
+  function removeFilterForMetadataKey(recordMetadataKey: string, filterName: string): void {
+    if (!liveRecordFilters[recordMetadataKey]) return
+    delete liveRecordFilters[recordMetadataKey][filterName]
+    if (Object.entries(liveRecordFilters[recordMetadataKey]).length == 0) {
+      delete liveRecordFilters[recordMetadataKey]
+    }
+  }
+
   function recordDirStatsUpdateTick(): void {
     recordStatTimer -= recordStatTickInterval
     if (recordStatTimer <= 0) {
       recordStatTimer = 0
       if (!retrievingRecordStats) {
-        updateRecordDirStats(...displayedRecords.map(([record]) => record.identifier))
+        updateRecordDirStats(...displayedRecords.map(({ record }) => record.identifier))
       }
     }
   }
@@ -432,26 +467,75 @@
       <TableHead class="normal-case">
         <TableHeadCell class="w-fit">
           {#if totalDisplayedIssueCount}
-            <ExclamationCircleOutline class="shrink-0" color="red" />
+            <ExclamationCircleOutline color="red" />
             <Tooltip
               >Validation failed for {Object.keys(displayedRecordIssueCount).length} (unsaved) records</Tooltip
             >
           {:else if modifiedRecords.size && Object.keys(recordFlushTimers).length}
-            <FloppyDiskOutline class="shrink-0" />
+            <FloppyDiskOutline />
             <Tooltip>{modifiedRecords.size} records still pending saving...</Tooltip>
           {:else}
-            <ClipboardCheckOutline class="shrink-0" />
+            <ClipboardCheckOutline />
             <Tooltip>Everything looks good and is saved!</Tooltip>
           {/if}
         </TableHeadCell>
         <TableHeadCell>Identifier</TableHeadCell>
-        {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key } (key)}
-          <TableHeadCell>{key}</TableHeadCell>
+        {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key, value } (key)}
+          <TableHeadCell>
+            <div class="flex w-fit"><FilterOutline /> <span>{key}</span></div>
+            <Popover title={`Filter on "${key}"`}>
+              <div class="space-y-2">
+                {#if transientRecordFilters[key]}
+                  <Badge>{transientRecordFilters[key].filterName}</Badge>
+                {/if}
+                {#if value.valueType == MetadataValueType.Date}
+                  <DateRecordFilterBuilder
+                    recordMetadataKey={key}
+                    filterUpdateCallback={(filter) => (transientRecordFilters[key] = filter)}
+                    addPredicateCallback={(filter) => addFilterForMetadataKey(key, filter)}
+                  />
+                {/if}
+                {#if value.valueType == MetadataValueType.Number}
+                  <NumberRecordFilterBuilder
+                    recordMetadataKey={key}
+                    filterUpdateCallback={(filter) => (transientRecordFilters[key] = filter)}
+                    addPredicateCallback={(filter) => addFilterForMetadataKey(key, filter)}
+                  />
+                {/if}
+                <TextRecordFilterBuilder
+                  recordMetadataKey={key}
+                  filterUpdateCallback={(filter) => (transientRecordFilters[key] = filter)}
+                  addPredicateCallback={(filter) => addFilterForMetadataKey(key, filter)}
+                />
+                <div class="ms-4 mb-3 flex">
+                  {#each Object.values(liveRecordFilters[key] || {}) as filter (filter.filterName)}
+                    <Badge
+                      dismissable
+                      onclose={() => removeFilterForMetadataKey(key, filter.filterName)}
+                      >{filter.filterName}</Badge
+                    >
+                  {:else}
+                    <span class="font-light text-sm">No filters added!</span>
+                  {/each}
+                </div>
+                <div class="flex">
+                  <Button
+                    color="alternative"
+                    disabled={!liveRecordFilters[key]}
+                    onclick={() => (liveRecordFilters[key] = {})}>Clear Filters</Button
+                  >
+                </div>
+              </div>
+            </Popover>
+            <!-- TODO on button click, show popover with filter options -->
+            <!-- TODO add different optioned filter predicates -->
+            <!-- TODO display filter predicates as dismissible badges where dismissing removes the filter -->
+          </TableHeadCell>
         {/each}
         <TableHeadCell></TableHeadCell>
       </TableHead>
       <TableBody>
-        {#each displayedRecords as [{ identifier, metadata }, liveRecordIndex] (liveRecordIndex)}
+        {#each displayedRecords as { record: { identifier, metadata }, index: liveRecordIndex } (liveRecordIndex)}
           <TableBodyRow class="border-gray-200">
             <TableBodyCell>
               {#if displayedRecordIssueCount[identifier]}
