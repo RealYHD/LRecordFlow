@@ -33,7 +33,7 @@
       {#snippet header()}
         <div>
           <Button
-            class="mr-4"
+            class="p-2!"
             size="xs"
             onclick={(e: MouseEvent) => {
               e.stopPropagation()
@@ -42,10 +42,10 @@
                 1
               )
             }}
-            color="secondary"
+            color="red"
             outline><TrashBinOutline size="xs" /></Button
           >
-          <span>Configure "{descriptor.key}"</span>
+          <span class="px-4">Configure "{descriptor.key}"</span>
         </div>
       {/snippet}
       <div class="flex flex-wrap p-2 items-stretch">
