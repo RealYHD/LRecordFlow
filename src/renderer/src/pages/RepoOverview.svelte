@@ -104,7 +104,7 @@
   let demoRecordFilter: RepositoryRecordFilter | undefined = $state(undefined)
   let displayedRecords: { record: RepositoryRecord; index: number }[] = $derived(
     filterRecords(liveRepoRecords, liveRecordFiltersList)
-  ) // TODO do something with this...
+  )
 
   const displayedMetadata: MetadataDescriptor[] = $derived(liveMetadataDescriptors)
   let recordLocks: Record<string, RecordLockStatus | undefined> = $derived(
@@ -313,7 +313,6 @@
 
   function updateRecordDirStats(...identifiers: string[]): void {
     retrievingRecordStats = true
-    // TODO check record locks
     const promises = []
     for (const identifier of identifiers) {
       recordExists(appStateStore.state.openedRepoPath, identifier).then((recordExists) => {
@@ -558,9 +557,6 @@
                 </div>
               </div>
             </Popover>
-            <!-- TODO on button click, show popover with filter options -->
-            <!-- TODO add different optioned filter predicates -->
-            <!-- TODO display filter predicates as dismissible badges where dismissing removes the filter -->
           </TableHeadCell>
         {/each}
         <TableHeadCell></TableHeadCell>
