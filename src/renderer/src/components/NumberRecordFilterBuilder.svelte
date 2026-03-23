@@ -30,21 +30,21 @@
       case 'greater':
         return {
           metadataKey: recordMetadataKey,
-          filterName: `${recordMetadataKey} > ${comparedToSnapshot}`,
+          displayName: `${recordMetadataKey} > ${comparedToSnapshot}`,
           predicate: (value) => Number(value) > comparedToSnapshot,
           must: must
         }
       case 'lesser':
         return {
           metadataKey: recordMetadataKey,
-          filterName: `${recordMetadataKey} < ${comparedToSnapshot}`,
+          displayName: `${recordMetadataKey} < ${comparedToSnapshot}`,
           predicate: (value) => Number(value) < comparedToSnapshot,
           must: must
         }
       case 'equal':
         return {
           metadataKey: recordMetadataKey,
-          filterName: `${recordMetadataKey} = ${comparedToSnapshot}`,
+          displayName: `${recordMetadataKey} = ${comparedToSnapshot}`,
           predicate: (value) => Number(value) == comparedToSnapshot,
           must: must
         }

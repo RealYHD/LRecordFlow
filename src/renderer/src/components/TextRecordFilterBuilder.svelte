@@ -33,7 +33,7 @@
           return {
             metadataKey: recordMetadataKey,
 
-            filterName: `"${filterSnapshot}" in "${recordMetadataKey}" (case-insensitive)`,
+            displayName: `"${filterSnapshot}" in "${recordMetadataKey}" (case-insensitive)`,
             predicate: (value) => value.toLowerCase().includes(filterSnapshot.toLowerCase()),
             must: must
           }
@@ -41,7 +41,7 @@
         return {
           metadataKey: recordMetadataKey,
 
-          filterName: `"${filterSnapshot}" in "${recordMetadataKey}"`,
+          displayName: `"${filterSnapshot}" in "${recordMetadataKey}"`,
           predicate: (value) => value.includes(filterSnapshot),
           must: must
         }
@@ -50,7 +50,7 @@
           return {
             metadataKey: recordMetadataKey,
 
-            filterName: `"${filterSnapshot}" begins with "${recordMetadataKey}" (case-insensitive)`,
+            displayName: `"${filterSnapshot}" begins with "${recordMetadataKey}" (case-insensitive)`,
             predicate: (value) => value.toLowerCase().startsWith(filterSnapshot.toLowerCase()),
             must: must
           }
@@ -58,7 +58,7 @@
         return {
           metadataKey: recordMetadataKey,
 
-          filterName: `"${filterSnapshot}" begins with "${recordMetadataKey}"`,
+          displayName: `"${filterSnapshot}" begins with "${recordMetadataKey}"`,
           predicate: (value) => value.startsWith(filterSnapshot),
           must: must
         }
@@ -67,7 +67,7 @@
           return {
             metadataKey: recordMetadataKey,
 
-            filterName: `"${filterSnapshot}" ends with "${recordMetadataKey}" (case-insensitive)`,
+            displayName: `"${filterSnapshot}" ends with "${recordMetadataKey}" (case-insensitive)`,
             predicate: (value) => value.endsWith(filterSnapshot.toLowerCase()),
             must: must
           }
@@ -75,7 +75,7 @@
         return {
           metadataKey: recordMetadataKey,
 
-          filterName: `"${filterSnapshot}" ends with "${recordMetadataKey}"`,
+          displayName: `"${filterSnapshot}" ends with "${recordMetadataKey}"`,
           predicate: (value) => value.endsWith(filterSnapshot),
           must: must
         }
@@ -83,7 +83,7 @@
         return {
           metadataKey: recordMetadataKey,
 
-          filterName:
+          displayName:
             `"${filterSnapshot}" (RegEx) matches "${recordMetadataKey}"` +
             (caseSensitive ? '' : ' (case-insensitive)'),
           predicate: (value) => {

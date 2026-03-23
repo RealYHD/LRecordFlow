@@ -98,25 +98,14 @@
     { delay: number; flushing: boolean; snapshot: RecordMetadata }
   > = $state({})
   let liveRecordFilters: Record<string, Record<string, RepositoryRecordFilter>> = $state({})
-  let transientRecordFilters: Record<string, RepositoryRecordFilter> = $state({})
-  const displayedRecords: { record: RepositoryRecord; index: number }[] = $derived(
-    liveRepoRecords
-      .map((record, index) => ({ record: record, index: index }))
-      .filter(({ record }) => {
-        for (const metadataKey in liveRecordFilters) {
-          const metadataFilters = liveRecordFilters[metadataKey]
-          let passed = false
-          for (const filterName in metadataFilters) {
-            const filter = metadataFilters[filterName]
-            let currentFilterPassed = filter.predicate(record.metadata[metadataKey])
-            passed = currentFilterPassed ? true : passed
-            if (filter.must && !currentFilterPassed) return false
-          }
-          if (!passed) return false // all or nothing through the columns
-        }
-        return true
-      })
+  let liveRecordFiltersList: RepositoryRecordFilter[] = $derived(
+    Object.values(liveRecordFilters).flatMap((val) => Object.values(val))
+  )
+  let demoRecordFilter: RepositoryRecordFilter | undefined = $state(undefined)
+  let displayedRecords: { record: RepositoryRecord; index: number }[] = $derived(
+    filterRecords(liveRepoRecords, liveRecordFiltersList)
   ) // TODO do something with this...
+
   const displayedMetadata: MetadataDescriptor[] = $derived(liveMetadataDescriptors)
   let recordLocks: Record<string, RecordLockStatus | undefined> = $derived(
     Object.fromEntries(
@@ -353,12 +342,26 @@
     })
   }
 
+  function updateDemoFilterForMetadataKey(filter: RepositoryRecordFilter | undefined): void {
+    // this prevents a recursion with the filter builders calling updated on effect...
+    if (demoRecordFilter && filter && filter.displayName == demoRecordFilter.displayName) return
+    demoRecordFilter = filter
+    let operatingFilters = [...liveRecordFiltersList]
+    if (filter) operatingFilters.push(demoRecordFilter)
+    displayedRecords = filterRecords(liveRepoRecords, operatingFilters)
+    // TODO clean the logic of the displayedRecords derivative
+    // For some reason, the derivative didn't update when the demoRecordFilter updated
+    // despite being dependent on it, and the demoRecordFilter was a valid state.
+    // Since there is a function updating it, and that is the only time it is being updated,
+    // we use the same function to override the derivative
+  }
+
   function addFilterForMetadataKey(
     recordMetadataKey: string,
     filter: RepositoryRecordFilter
   ): void {
     if (!liveRecordFilters[recordMetadataKey]) liveRecordFilters[recordMetadataKey] = {}
-    liveRecordFilters[recordMetadataKey][filter.filterName] = filter
+    liveRecordFilters[recordMetadataKey][filter.displayName] = filter
   }
   function removeFilterForMetadataKey(recordMetadataKey: string, filterName: string): void {
     if (!liveRecordFilters[recordMetadataKey]) return
@@ -377,6 +380,31 @@
       }
     }
   }
+
+  function filterRecords(
+    records: RepositoryRecord[],
+    filters: RepositoryRecordFilter[]
+  ): {
+    record: RepositoryRecord
+    index: number
+  }[] {
+    console.log('Re-calculating displayed records')
+    return records
+      .map((record, index) => ({ record: record, index: index }))
+      .filter(({ record }) => {
+        let passed = false
+        console.log(filters)
+        for (const filter of filters) {
+          if (!filter) continue
+          let currentFilterPassed = filter.predicate(record.metadata[filter.metadataKey] || '')
+          passed = currentFilterPassed ? true : passed
+          if (filter.must && !currentFilterPassed) return false
+        }
+        return passed || filters.length == 0
+      })
+  }
+
+  $inspect(liveRecordFiltersList)
 
   onMount(() => {
     loadAppState().then(() => {
@@ -483,36 +511,39 @@
         {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key, value } (key)}
           <TableHeadCell>
             <div class="flex w-fit"><FilterOutline /> <span>{key}</span></div>
-            <Popover title={`Filter on "${key}"`}>
+            <Popover
+              title={`Filter on "${key}"`}
+              onclose={() => updateDemoFilterForMetadataKey(undefined)}
+            >
               <div class="space-y-2">
-                {#if transientRecordFilters[key]}
-                  <Badge>{transientRecordFilters[key].filterName}</Badge>
+                {#if demoRecordFilter}
+                  <Badge>{demoRecordFilter.displayName}</Badge>
                 {/if}
                 {#if value.valueType == MetadataValueType.Date}
                   <DateRecordFilterBuilder
                     recordMetadataKey={key}
-                    filterUpdateCallback={(filter) => (transientRecordFilters[key] = filter)}
+                    filterUpdateCallback={(filter) => (demoRecordFilter[key] = filter)}
                     addPredicateCallback={(filter) => addFilterForMetadataKey(key, filter)}
                   />
                 {/if}
                 {#if value.valueType == MetadataValueType.Number}
                   <NumberRecordFilterBuilder
                     recordMetadataKey={key}
-                    filterUpdateCallback={(filter) => (transientRecordFilters[key] = filter)}
+                    filterUpdateCallback={(filter) => (demoRecordFilter[key] = filter)}
                     addPredicateCallback={(filter) => addFilterForMetadataKey(key, filter)}
                   />
                 {/if}
                 <TextRecordFilterBuilder
                   recordMetadataKey={key}
-                  filterUpdateCallback={(filter) => (transientRecordFilters[key] = filter)}
+                  filterUpdateCallback={(filter) => updateDemoFilterForMetadataKey(filter)}
                   addPredicateCallback={(filter) => addFilterForMetadataKey(key, filter)}
                 />
                 <div class="ms-4 mb-3 flex">
-                  {#each Object.values(liveRecordFilters[key] || {}) as filter (filter.filterName)}
+                  {#each Object.values(liveRecordFilters[key] || {}) as filter (filter.displayName)}
                     <Badge
                       dismissable
-                      onclose={() => removeFilterForMetadataKey(key, filter.filterName)}
-                      >{filter.filterName}</Badge
+                      onclose={() => removeFilterForMetadataKey(key, filter.displayName)}
+                      >{filter.displayName}</Badge
                     >
                   {:else}
                     <span class="font-light text-sm">No filters added!</span>
