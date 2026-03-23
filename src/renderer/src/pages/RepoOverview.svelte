@@ -521,24 +521,24 @@
                 {#if value.valueType == MetadataValueType.Date}
                   <DateRecordFilterBuilder
                     recordMetadataKey={key}
-                    filterUpdateCallback={(filter) => (demoRecordFilter[key] = filter)}
+                    filterUpdateCallback={updateDemoFilterForMetadataKey}
                     addPredicateCallback={(filter) => addFilterForMetadataKey(key, filter)}
                   />
                 {/if}
                 {#if value.valueType == MetadataValueType.Number}
                   <NumberRecordFilterBuilder
                     recordMetadataKey={key}
-                    filterUpdateCallback={(filter) => (demoRecordFilter[key] = filter)}
+                    filterUpdateCallback={updateDemoFilterForMetadataKey}
                     addPredicateCallback={(filter) => addFilterForMetadataKey(key, filter)}
                   />
                 {/if}
                 <TextRecordFilterBuilder
                   recordMetadataKey={key}
-                  filterUpdateCallback={(filter) => updateDemoFilterForMetadataKey(filter)}
+                  filterUpdateCallback={updateDemoFilterForMetadataKey}
                   addPredicateCallback={(filter) => addFilterForMetadataKey(key, filter)}
                 />
                 <div class="ms-4 mb-3 flex">
-                  {#each Object.values(liveRecordFilters[key] || {}) as filter (filter.displayName)}
+                  {#each Object.values(liveRecordFilters[key] || {}) as filter (getRecordFilterIdentifier(filter))}
                     <Badge dismissable onclose={() => removeFilterForMetadataKey(key, filter)}
                       >{filter.displayName}</Badge
                     >
