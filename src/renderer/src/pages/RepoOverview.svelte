@@ -15,7 +15,9 @@
     getRecordDirStats,
     attemptLockRecord,
     attemptUnlockRecord,
-    recordExists
+    recordExists,
+    getRecordFilterIdentifier,
+    recordFiltersEqual
   } from '../lib/repo.svelte'
   import {
     Badge,
@@ -343,12 +345,11 @@
 
   function updateDemoFilterForMetadataKey(filter: RepositoryRecordFilter | undefined): void {
     // this prevents a recursion with the filter builders calling updated on effect...
-    if (demoRecordFilter && filter && filter.displayName == demoRecordFilter.displayName) return
+    if (demoRecordFilter && filter && recordFiltersEqual(demoRecordFilter, filter)) return
     demoRecordFilter = filter
     let operatingFilters = [...liveRecordFiltersList]
     if (filter) operatingFilters.push(demoRecordFilter)
     displayedRecords = filterRecords(liveRepoRecords, operatingFilters)
-    // TODO clean the logic of the displayedRecords derivative
     // For some reason, the derivative didn't update when the demoRecordFilter updated
     // despite being dependent on it, and the demoRecordFilter was a valid state.
     // Since there is a function updating it, and that is the only time it is being updated,
@@ -360,11 +361,14 @@
     filter: RepositoryRecordFilter
   ): void {
     if (!liveRecordFilters[recordMetadataKey]) liveRecordFilters[recordMetadataKey] = {}
-    liveRecordFilters[recordMetadataKey][filter.displayName] = filter
+    liveRecordFilters[recordMetadataKey][getRecordFilterIdentifier(filter)] = filter
   }
-  function removeFilterForMetadataKey(recordMetadataKey: string, filterName: string): void {
+  function removeFilterForMetadataKey(
+    recordMetadataKey: string,
+    filter: RepositoryRecordFilter
+  ): void {
     if (!liveRecordFilters[recordMetadataKey]) return
-    delete liveRecordFilters[recordMetadataKey][filterName]
+    delete liveRecordFilters[recordMetadataKey][getRecordFilterIdentifier(filter)]
     if (Object.entries(liveRecordFilters[recordMetadataKey]).length == 0) {
       delete liveRecordFilters[recordMetadataKey]
     }
@@ -387,12 +391,10 @@
     record: RepositoryRecord
     index: number
   }[] {
-    console.log('Re-calculating displayed records')
     return records
       .map((record, index) => ({ record: record, index: index }))
       .filter(({ record }) => {
         let passed = false
-        console.log(filters)
         for (const filter of filters) {
           if (!filter) continue
           let currentFilterPassed = filter.predicate(record.metadata[filter.metadataKey] || '')
@@ -402,8 +404,6 @@
         return passed || filters.length == 0
       })
   }
-
-  $inspect(liveRecordFiltersList)
 
   onMount(() => {
     loadAppState().then(() => {
@@ -539,9 +539,7 @@
                 />
                 <div class="ms-4 mb-3 flex">
                   {#each Object.values(liveRecordFilters[key] || {}) as filter (filter.displayName)}
-                    <Badge
-                      dismissable
-                      onclose={() => removeFilterForMetadataKey(key, filter.displayName)}
+                    <Badge dismissable onclose={() => removeFilterForMetadataKey(key, filter)}
                       >{filter.displayName}</Badge
                     >
                   {:else}

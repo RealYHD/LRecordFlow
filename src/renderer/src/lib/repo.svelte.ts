@@ -5,7 +5,8 @@ import {
   type RecordDirStatus,
   type RecordMetadata,
   type RepositoryConfiguration,
-  type RepositoryRecord
+  type RepositoryRecord,
+  type RepositoryRecordFilter
 } from '../../../common/types/models'
 
 export function recordDataIsEqual(record1: RecordMetadata, record2: RecordMetadata) {
@@ -243,4 +244,17 @@ export async function importRepoRecordsFromTabular(
     identifierCol,
     pathColumns
   )
+}
+
+export function getRecordFilterIdentifier(recordFilter: RepositoryRecordFilter): string {
+  return `key:${recordFilter.metadataKey};must:${recordFilter.must};predicate:${recordFilter.predicate.toString()};`
+}
+
+export function recordFiltersEqual(
+  filter1: RepositoryRecordFilter,
+  filter2: RepositoryRecordFilter
+) {
+  if (!filter1 && filter2) return false
+  if (!filter2 && filter1) return false
+  return getRecordFilterIdentifier(filter1) == getRecordFilterIdentifier(filter2)
 }
