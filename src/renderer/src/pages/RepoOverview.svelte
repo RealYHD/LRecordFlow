@@ -37,6 +37,8 @@
   import EditRecordData from '../components/EditRecordData.svelte'
   import {
     AdjustmentsVerticalOutline,
+    AngleDownOutline,
+    AngleUpOutline,
     ChalkboardUserOutline,
     CheckCircleOutline,
     ClipboardCheckOutline,
@@ -110,10 +112,24 @@
   let liveRecordFiltersList: RepositoryRecordFilter[] = $derived(
     Object.values(liveRecordFilters).flatMap((val) => Object.values(val))
   )
+  let liveSortingColumns: Record<string, boolean> = $state({})
+
   let filteredRecords: { record: RepositoryRecord; index: number }[] = $derived(
     filterRecords(liveRepoRecords, [...liveRecordFiltersList, demoFilter])
   )
-  let sortedRecords: { record: RepositoryRecord; index: number }[] = $derived(filteredRecords)
+  let sortedRecords: { record: RepositoryRecord; index: number }[] = $derived.by(() => {
+    let orderedRecords = filteredRecords
+    for (const columnName in liveSortingColumns) {
+      let ascending = liveSortingColumns[columnName]
+      orderedRecords = orderedRecords.toSorted((a, b) => {
+        let valueA = a.record.metadata[columnName] || a.record[columnName]
+        let valueB = b.record.metadata[columnName] || b.record[columnName]
+        if (valueA == valueB) return 0
+        return (valueA > valueB ? 1 : -1) * (ascending ? 1 : -1)
+      })
+    }
+    return orderedRecords
+  })
   let displayedRecords: { record: RepositoryRecord; index: number }[] = $derived(sortedRecords)
   const displayedMetadata: MetadataDescriptor[] = $derived(liveMetadataDescriptors)
   let recordLocks: Record<string, RecordLockStatus | undefined> = $derived(
@@ -527,8 +543,28 @@
         </TableHeadCell>
         <TableHeadCell>
           <div class="flex w-fit">
-            <span>Identifier</span>
-
+            <Button
+              class="p-1! m-1 border-0"
+              outline
+              size="xs"
+              onclick={() => {
+                if (liveSortingColumns['identifier'] == undefined)
+                  liveSortingColumns['identifier'] = true
+                else if (liveSortingColumns['identifier'] == true)
+                  liveSortingColumns['identifier'] = false
+                else if (liveSortingColumns['identifier'] == false)
+                  delete liveSortingColumns['identifier']
+              }}>Identifier</Button
+            >
+            <span class="m-1">
+              {#if liveSortingColumns['identifier'] != undefined}
+                {#if liveSortingColumns['identifier']}
+                  <AngleUpOutline />
+                {:else}
+                  <AngleDownOutline />
+                {/if}
+              {/if}
+            </span>
             {#if liveRecordFilters['identifier'] || (demoFilter && demoFilter.key == 'identifier')}
               <span class="relative pl-1">
                 <FilterOutline color="orange" />
@@ -564,7 +600,25 @@
         {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key } (key)}
           <TableHeadCell>
             <div class="flex w-fit">
-              <span>{key}</span>
+              <Button
+                class="p-1! m-1 border-0"
+                outline
+                size="xs"
+                onclick={() => {
+                  if (liveSortingColumns[key] == undefined) liveSortingColumns[key] = true
+                  else if (liveSortingColumns[key] == true) liveSortingColumns[key] = false
+                  else if (liveSortingColumns[key] == false) delete liveSortingColumns[key]
+                }}>{key}</Button
+              >
+              <span class="m-1">
+                {#if liveSortingColumns[key] != undefined}
+                  {#if liveSortingColumns[key]}
+                    <AngleUpOutline />
+                  {:else}
+                    <AngleDownOutline />
+                  {/if}
+                {/if}
+              </span>
               {#if liveRecordFilters[key] || (demoFilter && demoFilter.key == key)}
                 <span class="relative pl-1"><FilterOutline color="orange" /> </span>
                 <Popover title={`Filter on "${key}"`}>
