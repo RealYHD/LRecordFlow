@@ -556,7 +556,7 @@
                   delete liveSortingColumns['identifier']
               }}>Identifier</Button
             >
-            <span class="m-1">
+            <span>
               {#if liveSortingColumns['identifier'] != undefined}
                 {#if liveSortingColumns['identifier']}
                   <AngleUpOutline />
@@ -610,7 +610,7 @@
                   else if (liveSortingColumns[key] == false) delete liveSortingColumns[key]
                 }}>{key}</Button
               >
-              <span class="m-1">
+              <span>
                 {#if liveSortingColumns[key] != undefined}
                   {#if liveSortingColumns[key]}
                     <AngleUpOutline />
