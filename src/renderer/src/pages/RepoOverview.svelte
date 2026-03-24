@@ -161,6 +161,7 @@
     ) // probably O(1)?
     editRecord(editingLiveIndex)
     editRecordDataOpen = true
+    createRecordIdentifier = ''
   }
 
   function editRecord(editRecordIndex: number): void {
