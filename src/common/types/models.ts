@@ -36,7 +36,7 @@ export interface MetadataDescriptor {
 export type RepRecordFilterPredicate = (value: string) => boolean
 
 export interface RepositoryRecordFilter {
-  metadataKey: string
+  key: string
   displayName: string
   predicate: RepRecordFilterPredicate
   must: boolean

@@ -57,6 +57,7 @@
   import TabularImport from '../components/TabularRecordImport.svelte'
   import { appStateStore, loadAppState } from '../lib/state.svelte'
   import {
+    MetadataValueType,
     type MetadataDescriptor,
     type RecordDirStatus,
     type RecordLockStatus,
@@ -75,6 +76,14 @@
   let liveMetadataDescriptors: MetadataDescriptor[] = $derived(
     aggregateMetadataDescriptors(liveRepoRecords, liveRepoConfiguration)
   )
+  let liveColumns: { displayName: string; key: string; valueType: MetadataValueType }[] = $derived([
+    { displayName: 'Identifier', key: 'identifier', valueType: MetadataValueType.Text },
+    ...liveMetadataDescriptors.map((value) => ({
+      displayName: value.key,
+      key: value.key,
+      valueType: value.value.valueType
+    }))
+  ])
   let liveRepoRecordsById: Record<string, RepositoryRecord> = $derived(
     Object.fromEntries(liveRepoRecords.map((recordData) => [recordData.identifier, recordData]))
   )
@@ -341,15 +350,15 @@
   }
 
   function addFilterForMetadataKey(filter: RepositoryRecordFilter): void {
-    if (!liveRecordFilters[filter.metadataKey]) liveRecordFilters[filter.metadataKey] = {}
-    liveRecordFilters[filter.metadataKey][filter.identifier] = filter
+    if (!liveRecordFilters[filter.key]) liveRecordFilters[filter.key] = {}
+    liveRecordFilters[filter.key][filter.identifier] = filter
   }
 
   function removeFilterForMetadataKey(filter: RepositoryRecordFilter): void {
-    if (!liveRecordFilters[filter.metadataKey]) return
-    delete liveRecordFilters[filter.metadataKey][filter.identifier]
-    if (Object.entries(liveRecordFilters[filter.metadataKey]).length == 0) {
-      delete liveRecordFilters[filter.metadataKey]
+    if (!liveRecordFilters[filter.key]) return
+    delete liveRecordFilters[filter.key][filter.identifier]
+    if (Object.entries(liveRecordFilters[filter.key]).length == 0) {
+      delete liveRecordFilters[filter.key]
     }
   }
 
@@ -379,7 +388,9 @@
           if (!filter) {
             continue
           }
-          let currentFilterPassed = filter.predicate(record.metadata[filter.metadataKey] || '')
+          let currentFilterPassed = filter.predicate(
+            record.metadata[filter.key] || record[filter.key] || ''
+          )
           passed = currentFilterPassed ? true : passed
           if (filter.must && !currentFilterPassed) return false
         }
@@ -451,7 +462,7 @@
     <div class="w-fit h-fit mb-2 mx-2">
       <Label>Filter Configuration</Label>
       <RecordFilterBuilder
-        metadataDescs={liveMetadataDescriptors}
+        columns={liveColumns}
         onFilterCreated={addFilterForMetadataKey}
         bind:filter={demoFilter}
       />
@@ -490,6 +501,11 @@
     </div>
   </div>
   <div>
+    <div>
+      <span class="pl-1 font-light text-sm"
+        >Displaying {displayedRecords.length} records out of {liveRepoRecords.length}</span
+      >
+    </div>
     <Table hoverable={true} border={true} class="table-auto">
       <TableHead class="normal-case">
         <TableHeadCell class="w-fit">
@@ -506,30 +522,69 @@
             <Tooltip>Everything looks good and is saved!</Tooltip>
           {/if}
         </TableHeadCell>
-        <TableHeadCell>Identifier</TableHeadCell>
+        <TableHeadCell>
+          <div class="flex w-fit">
+            <span>Identifier</span>
+
+            {#if liveRecordFilters['identifier'] || (demoFilter && demoFilter.key == 'identifier')}
+              <span class="relative pl-1">
+                <FilterOutline color="orange" />
+              </span>
+              <Popover title="Identifier Filters">
+                <div class="space-y-2">
+                  <div class="mb-3 flex">
+                    {#each Object.values(liveRecordFilters['identifier'] || {}) as filter (filter.key)}
+                      <Badge dismissable onclose={() => removeFilterForMetadataKey(filter)}
+                        >{filter.displayName}</Badge
+                      >
+                    {:else}
+                      <span class="font-light text-sm">No filters added!</span>
+                    {/each}
+                  </div>
+                  <div class="flex">
+                    <Button
+                      size="xs"
+                      class="p-1!"
+                      color="alternative"
+                      disabled={!liveRecordFilters['Identifier']}
+                      onclick={() => (liveRecordFilters['Identifier'] = {})}>Clear Filters</Button
+                    >
+                  </div>
+                </div>
+              </Popover>
+            {/if}
+          </div>
+        </TableHeadCell>
         {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key } (key)}
           <TableHeadCell>
-            <div class="flex w-fit"><FilterOutline /> <span>{key}</span></div>
-            <Popover title={`Filter on "${key}"`}>
-              <div class="space-y-2">
-                <div class="ms-4 mb-3 flex">
-                  {#each Object.values(liveRecordFilters[key] || {}) as filter (filter.identifier)}
-                    <Badge dismissable onclose={() => removeFilterForMetadataKey(filter)}
-                      >{filter.displayName}</Badge
-                    >
-                  {:else}
-                    <span class="font-light text-sm">No filters added!</span>
-                  {/each}
-                </div>
-                <div class="flex">
-                  <Button
-                    color="alternative"
-                    disabled={!liveRecordFilters[key]}
-                    onclick={() => (liveRecordFilters[key] = {})}>Clear Filters</Button
-                  >
-                </div>
-              </div>
-            </Popover>
+            <div class="flex w-fit">
+              <span>{key}</span>
+              {#if liveRecordFilters[key] || (demoFilter && demoFilter.key == key)}
+                <span class="relative pl-1"><FilterOutline color="orange" /> </span>
+                <Popover title={`Filter on "${key}"`}>
+                  <div class="space-y-2">
+                    <div class="mb-3 flex">
+                      {#each Object.values(liveRecordFilters[key] || {}) as filter (filter.identifier)}
+                        <Badge dismissable onclose={() => removeFilterForMetadataKey(filter)}
+                          >{filter.displayName}</Badge
+                        >
+                      {:else}
+                        <span class="font-light text-sm">No filters added!</span>
+                      {/each}
+                    </div>
+                    <div class="flex">
+                      <Button
+                        size="xs"
+                        class="p-1!"
+                        color="alternative"
+                        disabled={!liveRecordFilters[key]}
+                        onclick={() => (liveRecordFilters[key] = {})}>Clear Filters</Button
+                      >
+                    </div>
+                  </div>
+                </Popover>
+              {/if}
+            </div>
           </TableHeadCell>
         {/each}
         <TableHeadCell></TableHeadCell>

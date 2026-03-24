@@ -1,19 +1,15 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
   import { Button, ButtonGroup, Input, InputAddon, Select } from 'flowbite-svelte'
-  import {
-    MetadataValueType,
-    type MetadataDescriptor,
-    type RepositoryRecordFilter
-  } from '../../../common/types/models'
+  import { MetadataValueType, type RepositoryRecordFilter } from '../../../common/types/models'
 
   type PredicateBuilder = (operand: string) => (recordValue: string) => boolean
   let {
-    metadataDescs,
+    columns,
     onFilterCreated: filterCreated,
     filter = $bindable()
   }: {
-    metadataDescs: MetadataDescriptor[]
+    columns: { displayName: string; key: string; valueType: MetadataValueType }[]
     onFilterCreated: (filter: RepositoryRecordFilter) => void
     filter: RepositoryRecordFilter
   } = $props()
@@ -71,7 +67,7 @@
   }
   let operandValue: string = $state('')
   let metadataKeyValueTypes: Record<string, MetadataValueType> = $derived(
-    Object.fromEntries(metadataDescs.map((desc) => [desc.key, desc.value.valueType]))
+    Object.fromEntries(columns.map((desc) => [desc.key, desc.valueType]))
   )
   let must: boolean = $state(false)
   let selectedMetadataKey = $state(undefined)
@@ -114,7 +110,7 @@
     return {
       displayName: getDisplayName(),
       identifier: getFilterIdentifier(),
-      metadataKey: selectedMetadataKey,
+      key: selectedMetadataKey,
       must: must,
       predicate: operatorNames[selectedOperator].predicateBuilder($state.snapshot(operandValue))
     }
@@ -162,7 +158,7 @@
       bind:value={must}
     />
     <Select
-      items={metadataDescs.map((desc) => ({ name: desc.key, value: desc.key }))}
+      items={columns.map((desc) => ({ name: desc.displayName, value: desc.key }))}
       bind:value={selectedMetadataKey}
     />
     {#if selectedMetadataKey && selectedMetadataKey.length}

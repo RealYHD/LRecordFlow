@@ -12,7 +12,7 @@ const recordMetadataFilename = '.lrf.record.json'
 const repoConfigurationFilename = '.lrf.config.json'
 const recordLockInfo = '.lrf.lock-info.json'
 
-const ignoredRecordFolders = ['.git']
+const ignoredRecordExtensions = ['.git', '.lock']
 function getRecordPath(localRepoPath: string, recordIdentifier: string): string {
   return path.join(localRepoPath, recordIdentifier)
 }
@@ -219,7 +219,11 @@ export async function getAllRepoRecords(localRepoPath: string): Promise<string[]
   if (!(await repoExists(localRepoPath))) return []
   return (await readdir(localRepoPath, { withFileTypes: true }))
     .filter((entry) => {
-      return entry.isDirectory() && !ignoredRecordFolders.includes(entry.name)
+      return (
+        entry.isDirectory() &&
+        !ignoredRecordExtensions.includes(path.extname(entry.name)) &&
+        !ignoredRecordExtensions.includes(entry.name)
+      )
     })
     .map((dir) => dir.name)
 }
