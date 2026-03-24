@@ -102,7 +102,7 @@
       : {}
   )
   function getDisplayName(): string {
-    return `${must ? 'All' : 'Any'} "${selectedMetadataKey}" must ${operatorNames[selectedOperator].displayName} ${operandValue}`
+    return `${must ? 'All' : 'Any'} "${selectedMetadataKey}" must ${operatorNames[selectedOperator].displayName} "${operandValue}"`
   }
 
   function getFilterIdentifier(): string {

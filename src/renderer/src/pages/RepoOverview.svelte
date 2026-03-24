@@ -23,6 +23,7 @@
     ButtonGroup,
     Drawer,
     Input,
+    Label,
     Modal,
     Popover,
     Table,
@@ -373,9 +374,9 @@
       .map((record, index) => ({ record: record, index: index }))
       .filter(({ record }) => {
         let passed = false
+        if (filters.length == 1 && !filters[0]) return true
         for (const filter of filters) {
           if (!filter) {
-            passed = true
             continue
           }
           let currentFilterPassed = filter.predicate(record.metadata[filter.metadataKey] || '')
@@ -446,41 +447,46 @@
 </Drawer>
 
 <div class="w-full h-full px-4 sm:px-1 pt-4">
-  <div class="mb-2 mx-1 space-x-2 space-y-2 flex flex-wrap justify-end">
-    <RecordFilterBuilder
-      metadataDescs={liveMetadataDescriptors}
-      onFilterCreated={addFilterForMetadataKey}
-      bind:filter={demoFilter}
-    />
-    {#if demoFilter}
-      <Popover>
-        <Badge>{demoFilter.displayName}</Badge>
-      </Popover>
-    {/if}
-    <ButtonGroup>
-      <Input type="text" placeholder="Identifier" bind:value={createRecordIdentifier} />
-      <Button onclick={() => addRecord()} disabled={createDisabled}><PlusOutline /></Button>
-    </ButtonGroup>
-    <Tooltip>Add Record</Tooltip>
-    <div>
-      <Button
-        outline
-        color="secondary"
-        onclick={() => {
-          importTabularOpen = true
-        }}><FileImportOutline /></Button
-      >
-      <Tooltip>Import data from Tabular</Tooltip>
-      <Button
-        outline
-        color="secondary"
-        onclick={() => {
-          editRepoConfigOpen = true
-        }}
-      >
-        <AdjustmentsVerticalOutline />
-      </Button>
-      <Tooltip>Configure Repository</Tooltip>
+  <div class="mb-2 mx-1 flex flex-wrap justify-end items-end">
+    <div class="w-fit h-fit mb-2 mx-2">
+      <Label>Filter Configuration</Label>
+      <RecordFilterBuilder
+        metadataDescs={liveMetadataDescriptors}
+        onFilterCreated={addFilterForMetadataKey}
+        bind:filter={demoFilter}
+      />
+      {#if demoFilter}
+        <Popover>
+          <Badge>{demoFilter.displayName}</Badge>
+        </Popover>
+      {/if}
+    </div>
+    <div class="w-fit h-fit mb-2 mx-2">
+      <ButtonGroup>
+        <Input type="text" placeholder="Identifier" bind:value={createRecordIdentifier} />
+        <Button onclick={() => addRecord()} disabled={createDisabled}><PlusOutline /></Button>
+      </ButtonGroup>
+      <Tooltip>Add Record</Tooltip>
+    </div>
+    <div class="w-fit h-fit mb-2 mx-2">
+      <ButtonGroup>
+        <Button
+          id="import-button"
+          onclick={() => {
+            importTabularOpen = true
+          }}><FileImportOutline /></Button
+        >
+        <Button
+          id="repo-configure-button"
+          onclick={() => {
+            editRepoConfigOpen = true
+          }}
+        >
+          <AdjustmentsVerticalOutline />
+        </Button>
+      </ButtonGroup>
+      <Tooltip triggeredBy="#import-button">Import data from Tabular</Tooltip>
+      <Tooltip triggeredBy="#repo-configure-button">Configure Repository</Tooltip>
     </div>
   </div>
   <div>

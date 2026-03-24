@@ -130,8 +130,18 @@ export async function getRecordDirStats(
   let recordPath = path.join(localRepoPath, recordIdentifier)
   let recordLockInfoPath = path.join(localRepoPath, recordIdentifier, recordLockInfo)
   let lastModifiedTime = (await stat(recordPath)).mtime
+  let lockStatus: RecordLockStatus = {
+    currentUser: userInfo().username,
+    lockDate: new Date()
+  }
   if (await check(recordPath)) {
-    let lockStatus: RecordLockStatus = JSON.parse(await readFile(recordLockInfoPath, 'utf-8'))
+    // Has ownership over lock
+    try {
+      await access(recordLockInfoPath)
+      lockStatus = JSON.parse(await readFile(recordLockInfoPath, 'utf-8'))
+    } catch (error) {
+      await writeFile(recordLockInfoPath, JSON.stringify(lockStatus))
+    }
     return { lastModified: lastModifiedTime, lockStatus: lockStatus }
   } else {
     return { lastModified: lastModifiedTime, lockStatus: null }
