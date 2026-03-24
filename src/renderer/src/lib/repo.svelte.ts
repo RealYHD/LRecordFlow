@@ -117,7 +117,7 @@ export function validateRecords(
       recordIssues[key] = []
       const metadataIssues = recordIssues[key]
       if (key.trim() == '') metadataIssues.push('Metadata key cannot be empty.')
-      if (!record.metadata[key] && !required) continue
+      if (record.metadata[key] == undefined && !required) continue
       let recordStringValue: string = (record.metadata[key] || '').toString()
       switch (valueDesc.valueType) {
         case MetadataValueType.Date:

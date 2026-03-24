@@ -71,7 +71,7 @@
           {key}
           {#if required}
             (Required by Repository)
-          {:else if !recordData.metadata[key]}
+          {:else if recordData.metadata[key] == undefined}
             (Defined by Other Record)
           {/if}
         </Label>
@@ -115,7 +115,7 @@
             </ul>
           </Helper>
         {/if}
-        {#if recordData.metadata[key]}
+        {#if recordData.metadata[key] != undefined}
           <div class="mt-2">
             <Button
               size="xs"
