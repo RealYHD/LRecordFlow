@@ -25,6 +25,7 @@
     Input,
     Label,
     Modal,
+    PaginationNav,
     Popover,
     Table,
     TableBody,
@@ -39,6 +40,8 @@
     AdjustmentsVerticalOutline,
     AngleDownOutline,
     AngleUpOutline,
+    ArrowLeftOutline,
+    ArrowRightOutline,
     ChalkboardUserOutline,
     CheckCircleOutline,
     ClipboardCheckOutline,
@@ -113,7 +116,9 @@
     Object.values(liveRecordFilters).flatMap((val) => Object.values(val))
   )
   let liveSortingColumns: Record<string, boolean> = $state({})
-
+  let maxPerPage: number = $state(25)
+  let currentPage: number = $state(1)
+  let totalPages: number = $derived(Math.ceil(liveRepoRecords.length / maxPerPage))
   let filteredRecords: { record: RepositoryRecord; index: number }[] = $derived(
     filterRecords(liveRepoRecords, [...liveRecordFiltersList, demoFilter])
   )
@@ -124,13 +129,30 @@
       orderedRecords = orderedRecords.toSorted((a, b) => {
         let valueA = a.record.metadata[columnName] || a.record[columnName]
         let valueB = b.record.metadata[columnName] || b.record[columnName]
-        if (valueA == valueB) return 0
-        return (valueA > valueB ? 1 : -1) * (ascending ? 1 : -1)
+        let configuredMetadataDesc = liveRepoConfiguration.defined.find(
+          (desc) => desc.key == columnName
+        )
+        try {
+          switch (configuredMetadataDesc.value.valueType) {
+            case MetadataValueType.Date:
+              return Date.parse(valueA) - Date.parse(valueB)
+            case MetadataValueType.Number:
+              return Number(valueA) - Number(valueB)
+            default:
+              if (valueA == valueB) return 0
+              return (valueA > valueB ? 1 : -1) * (ascending ? 1 : -1)
+          }
+        } catch {
+          if (valueA == valueB) return 0
+          return (valueA > valueB ? 1 : -1) * (ascending ? 1 : -1)
+        }
       })
     }
     return orderedRecords
   })
-  let displayedRecords: { record: RepositoryRecord; index: number }[] = $derived(sortedRecords)
+  let displayedRecords: { record: RepositoryRecord; index: number }[] = $derived(
+    sortedRecords.slice((currentPage - 1) * maxPerPage, currentPage * maxPerPage)
+  )
   const displayedMetadata: MetadataDescriptor[] = $derived(liveMetadataDescriptors)
   let recordLocks: Record<string, RecordLockStatus | undefined> = $derived(
     Object.fromEntries(
@@ -346,6 +368,15 @@
           promises.push(
             getRecordDirStats(appStateStore.state.openedRepoPath, identifier).then(
               (recordDirStat) => {
+                if (recordDirStat.lastModified == null) {
+                  let liveRecordIndex = liveRepoRecords.findIndex(
+                    (value) => value.identifier == identifier
+                  )
+                  if (liveRecordIndex >= 0) {
+                    removeRecord(liveRecordIndex)
+                  }
+                  return // It was deleted
+                }
                 if (
                   (liveRecordStats[identifier] &&
                     liveRecordStats[identifier].lastModified < recordDirStat.lastModified) ||
@@ -475,6 +506,56 @@
   />
 </Drawer>
 
+{#snippet columnHeaderDisplay(key: string, displayName: string)}
+  <div class="flex items-center">
+    <Button
+      class="py-1! px-2! m-1 border-0"
+      outline
+      size="xs"
+      onclick={() => {
+        if (liveSortingColumns[key] == undefined) liveSortingColumns[key] = true
+        else if (liveSortingColumns[key] == true) liveSortingColumns[key] = false
+        else if (liveSortingColumns[key] == false) delete liveSortingColumns[key]
+      }}
+      >{key}
+      <span class="pl-1 w-fit h-fit">
+        {#if liveSortingColumns[key] != undefined}
+          {#if liveSortingColumns[key]}
+            <AngleUpOutline size="xs" />
+          {:else}
+            <AngleDownOutline size="xs" />
+          {/if}
+        {/if}
+      </span>
+    </Button>
+    {#if liveRecordFilters[key] || (demoFilter && demoFilter.key == key)}
+      <span class="relative"><FilterOutline color="orange" /> </span>
+      <Popover title={`Filter on "${displayName}"`}>
+        <div class="space-y-2">
+          <div class="mb-3 flex">
+            {#each Object.values(liveRecordFilters[key] || {}) as filter (filter.identifier)}
+              <Badge class="m-1" dismissable onclose={() => removeFilterForMetadataKey(filter)}
+                >{filter.displayName}</Badge
+              >
+            {:else}
+              <span class="font-light text-sm">No filters added!</span>
+            {/each}
+          </div>
+          <div class="flex">
+            <Button
+              size="xs"
+              class="p-1!"
+              color="alternative"
+              disabled={!liveRecordFilters[key]}
+              onclick={() => (liveRecordFilters[key] = {})}>Clear Filters</Button
+            >
+          </div>
+        </div>
+      </Popover>
+    {/if}
+  </div>
+{/snippet}
+
 <div class="w-full h-full px-4 sm:px-1 pt-4">
   <div class="mb-2 mx-1 flex flex-wrap justify-end items-end">
     <div class="w-fit h-fit mb-2 mx-2">
@@ -498,33 +579,32 @@
       </ButtonGroup>
     </div>
     <div class="w-fit h-fit mb-2 mx-2">
-      <Label>Other Operations</Label>
+      <Label>Max Records Per Page</Label>
       <ButtonGroup>
-        <Button
-          id="import-button"
-          onclick={() => {
-            importTabularOpen = true
-          }}><FileImportOutline /></Button
-        >
-        <Button
-          id="repo-configure-button"
-          onclick={() => {
-            editRepoConfigOpen = true
-          }}
-        >
-          <AdjustmentsVerticalOutline />
-        </Button>
+        <Input type="number" bind:value={maxPerPage} />
       </ButtonGroup>
+    </div>
+    <div class="w-fit h-fit mb-2 mx-2">
+      <Button
+        id="import-button"
+        onclick={() => {
+          importTabularOpen = true
+        }}><FileImportOutline /></Button
+      >
+      <Button
+        id="repo-configure-button"
+        onclick={() => {
+          editRepoConfigOpen = true
+        }}
+      >
+        <AdjustmentsVerticalOutline />
+      </Button>
       <Tooltip triggeredBy="#import-button">Import data from Tabular</Tooltip>
-      <Tooltip triggeredBy="#repo-configure-button">Configure Repository</Tooltip>
+      <Tooltip triggeredBy="#repo-configure-button">Define Metadata</Tooltip>
     </div>
   </div>
   <div>
-    <div>
-      <span class="pl-1 font-light text-sm"
-        >Displaying {displayedRecords.length} records out of {liveRepoRecords.length}</span
-      >
-    </div>
+    {@render tableStats()}
     <Table hoverable={true} border={true} class="table-auto">
       <TableHead class="normal-case">
         <TableHeadCell class="w-fit">
@@ -542,112 +622,11 @@
           {/if}
         </TableHeadCell>
         <TableHeadCell>
-          <div class="flex w-fit">
-            <Button
-              class="p-1! m-1 border-0"
-              outline
-              size="xs"
-              onclick={() => {
-                if (liveSortingColumns['identifier'] == undefined)
-                  liveSortingColumns['identifier'] = true
-                else if (liveSortingColumns['identifier'] == true)
-                  liveSortingColumns['identifier'] = false
-                else if (liveSortingColumns['identifier'] == false)
-                  delete liveSortingColumns['identifier']
-              }}>Identifier</Button
-            >
-            <span>
-              {#if liveSortingColumns['identifier'] != undefined}
-                {#if liveSortingColumns['identifier']}
-                  <AngleUpOutline />
-                {:else}
-                  <AngleDownOutline />
-                {/if}
-              {/if}
-            </span>
-            {#if liveRecordFilters['identifier'] || (demoFilter && demoFilter.key == 'identifier')}
-              <span class="relative pl-1">
-                <FilterOutline color="orange" />
-              </span>
-              <Popover title="Identifier Filters">
-                <div class="space-y-2">
-                  <div class="mb-3 flex">
-                    {#each Object.values(liveRecordFilters['identifier'] || {}) as filter (filter.key)}
-                      <Badge
-                        class="m-1"
-                        dismissable
-                        onclose={() => removeFilterForMetadataKey(filter)}
-                        >{filter.displayName}</Badge
-                      >
-                    {:else}
-                      <span class="font-light text-sm">No filters added!</span>
-                    {/each}
-                  </div>
-                  <div class="flex">
-                    <Button
-                      size="xs"
-                      class="p-1!"
-                      color="alternative"
-                      disabled={!liveRecordFilters['Identifier']}
-                      onclick={() => (liveRecordFilters['Identifier'] = {})}>Clear Filters</Button
-                    >
-                  </div>
-                </div>
-              </Popover>
-            {/if}
-          </div>
+          {@render columnHeaderDisplay('identifier', 'Identifier')}
         </TableHeadCell>
         {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key } (key)}
           <TableHeadCell>
-            <div class="flex w-fit">
-              <Button
-                class="p-1! m-1 border-0"
-                outline
-                size="xs"
-                onclick={() => {
-                  if (liveSortingColumns[key] == undefined) liveSortingColumns[key] = true
-                  else if (liveSortingColumns[key] == true) liveSortingColumns[key] = false
-                  else if (liveSortingColumns[key] == false) delete liveSortingColumns[key]
-                }}>{key}</Button
-              >
-              <span>
-                {#if liveSortingColumns[key] != undefined}
-                  {#if liveSortingColumns[key]}
-                    <AngleUpOutline />
-                  {:else}
-                    <AngleDownOutline />
-                  {/if}
-                {/if}
-              </span>
-              {#if liveRecordFilters[key] || (demoFilter && demoFilter.key == key)}
-                <span class="relative pl-1"><FilterOutline color="orange" /> </span>
-                <Popover title={`Filter on "${key}"`}>
-                  <div class="space-y-2">
-                    <div class="mb-3 flex">
-                      {#each Object.values(liveRecordFilters[key] || {}) as filter (filter.identifier)}
-                        <Badge
-                          class="m-1"
-                          dismissable
-                          onclose={() => removeFilterForMetadataKey(filter)}
-                          >{filter.displayName}</Badge
-                        >
-                      {:else}
-                        <span class="font-light text-sm">No filters added!</span>
-                      {/each}
-                    </div>
-                    <div class="flex">
-                      <Button
-                        size="xs"
-                        class="p-1!"
-                        color="alternative"
-                        disabled={!liveRecordFilters[key]}
-                        onclick={() => (liveRecordFilters[key] = {})}>Clear Filters</Button
-                      >
-                    </div>
-                  </div>
-                </Popover>
-              {/if}
-            </div>
+            {@render columnHeaderDisplay(key, key)}
           </TableHeadCell>
         {/each}
         <TableHeadCell></TableHeadCell>
@@ -681,7 +660,7 @@
             <TableBodyCell>{identifier}</TableBodyCell>
             {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key }, colIndex (colIndex)}
               <TableBodyCell>
-                <div class="flex">
+                <div class="flex items-center">
                   {#if displayedRecordIssues[identifier][key] && displayedRecordIssues[identifier][key].length}
                     <ExclamationCircleOutline color="red" class="shrink-0" />
                     <Popover>
@@ -749,5 +728,28 @@
         {/each}
       </TableBody>
     </Table>
+    {@render tableStats()}
   </div>
 </div>
+
+{#snippet tableStats()}
+  <div class="pl-1 font-light text-sm mx-auto w-fit my-2">
+    <div class="w-fit mb-2">
+      Displaying {displayedRecords.length} records out of {liveRepoRecords.length}. Showing maximum
+      of {maxPerPage}
+      per page. Currently on page {currentPage} of {totalPages}.
+    </div>
+    <div class="w-fit mx-auto">
+      <PaginationNav {currentPage} {totalPages} onPageChange={(page) => (currentPage = page)}>
+        {#snippet prevContent()}
+          <span class="sr-only">Previous</span>
+          <ArrowLeftOutline class="h-5 w-5" />
+        {/snippet}
+        {#snippet nextContent()}
+          <span class="sr-only">Next</span>
+          <ArrowRightOutline class="h-5 w-5" />
+        {/snippet}
+      </PaginationNav>
+    </div>
+  </div>
+{/snippet}

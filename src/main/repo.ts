@@ -129,10 +129,15 @@ export async function getRecordDirStats(
 ): Promise<RecordDirStatus> {
   let recordPath = path.join(localRepoPath, recordIdentifier)
   let recordLockInfoPath = path.join(localRepoPath, recordIdentifier, recordLockInfo)
-  let lastModifiedTime = (await stat(recordPath)).mtime
   let lockStatus: RecordLockStatus = {
     currentUser: userInfo().username,
     lockDate: new Date()
+  }
+  let lastModifiedTime: Date | undefined = undefined
+  try {
+    lastModifiedTime = (await stat(recordPath)).mtime
+  } catch (error) {
+    return { lastModified: null, lockStatus: null }
   }
   if (await check(recordPath)) {
     // Has ownership over lock

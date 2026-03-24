@@ -1,5 +1,5 @@
 export interface RecordDirStatus {
-  lastModified: Date
+  lastModified: Date | null
   lockStatus: RecordLockStatus | null
 }
 
