@@ -89,7 +89,9 @@
             required
             bind:value={
               () =>
-                isNaN(Date.parse(recordData[key])) ? undefined : new Date(recordData.metadata[key]),
+                isNaN(Date.parse(recordData.metadata[key]))
+                  ? undefined
+                  : new Date(recordData.metadata[key]),
               (v) => (recordData.metadata[key] = v.toDateString())
             }
           />
