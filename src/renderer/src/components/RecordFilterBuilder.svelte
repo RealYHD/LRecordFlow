@@ -1,42 +1,85 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
-  import { Button, ButtonGroup, InputAddon, Select } from 'flowbite-svelte'
-  import type {
-    MetadataDescriptor,
+  import { Button, ButtonGroup, Input, InputAddon, Select } from 'flowbite-svelte'
+  import {
     MetadataValueType,
-    RepositoryRecordFilter
+    type MetadataDescriptor,
+    type RepositoryRecordFilter
   } from '../../../common/types/models'
 
   type PredicateBuilder = (operand: string) => (recordValue: string) => boolean
   let {
     metadataDescs,
-    keyOperators,
-    operandValue = $bindable(),
     onFilterCreated: filterCreated,
     filter = $bindable()
   }: {
     metadataDescs: MetadataDescriptor[]
-    keyOperators: Record<
-      string,
-      {
-        operations: {
-          displayName: string
-          identifier: string
-          predicateBuilder: PredicateBuilder
-        }[]
-        operandSelector: Snippet
-      }
-    >
-    operandValue: string
     onFilterCreated: (filter: RepositoryRecordFilter) => void
     filter: RepositoryRecordFilter
   } = $props()
 
+  let keyOperators: Record<
+    string,
+    {
+      operations: {
+        displayName: string
+        identifier: string
+        predicateBuilder: PredicateBuilder
+      }[]
+      operandSelector: Snippet
+    }
+  > = {
+    text: {
+      operations: [
+        {
+          displayName: 'have (case-insensitive)',
+          identifier: 'have-case-insensitive',
+          predicateBuilder: (operand) => {
+            return (value) => value.toLowerCase().includes(operand.toLowerCase())
+          }
+        },
+        {
+          displayName: 'have (case-sensitive)',
+          identifier: 'have-case-sensitive',
+          predicateBuilder: (operand) => (value) => value.includes(operand)
+        },
+        {
+          displayName: 'begin with (case-insensitive)',
+          identifier: 'begin-with-case-insensitive',
+          predicateBuilder: (operand) => (value) =>
+            value.toLowerCase().startsWith(operand.toLowerCase())
+        },
+        {
+          displayName: 'begin with (case-sensitive)',
+          identifier: 'begin-with-case-sensitive',
+          predicateBuilder: (operand) => (value) => value.startsWith(operand)
+        },
+        {
+          displayName: 'end with (case-insensitive)',
+          identifier: 'end-with-case-insensitive',
+          predicateBuilder: (operand) => (value) =>
+            value.toLowerCase().endsWith(operand.toLowerCase())
+        },
+        {
+          displayName: 'end with (case-sensitive)',
+          identifier: 'end-with-case-sensitive',
+          predicateBuilder: (operand) => (value) => value.startsWith(operand)
+        }
+      ],
+      operandSelector: textSelector
+    }
+  }
+  let operandValue: string = $state('')
   let metadataKeyValueTypes: Record<string, MetadataValueType> = $derived(
     Object.fromEntries(metadataDescs.map((desc) => [desc.key, desc.value.valueType]))
   )
   let must: boolean = $state(false)
   let selectedMetadataKey = $state(undefined)
+  let selectedMetadataValueType: MetadataValueType = $derived(
+    Object.keys(keyOperators).includes(metadataKeyValueTypes[selectedMetadataKey])
+      ? metadataKeyValueTypes[selectedMetadataKey]
+      : MetadataValueType.Text
+  )
   let selectedOperator = $state(undefined)
   let filterComplete = $derived(
     selectedMetadataKey && selectedOperator && operandValue && operandValue.length
@@ -47,7 +90,7 @@
   > = $derived(
     selectedMetadataKey
       ? Object.fromEntries(
-          keyOperators[metadataKeyValueTypes[selectedMetadataKey]].operations.map((operator) => [
+          keyOperators[selectedMetadataValueType].operations.map((operator) => [
             operator.identifier,
             {
               displayName: operator.displayName,
@@ -90,6 +133,23 @@
   })
 </script>
 
+<!-- {#snippet dateSelector()}
+  <Datepicker
+    bind:value={
+      () => (isNaN(Date.parse(operandValue)) ? undefined : new Date(operandValue)),
+      (v: Date) => v.toDateString()
+    }
+  />
+{/snippet} -->
+
+<!-- {#snippet numberSelector()}
+  <Input type="number" bind:value={operandValue} />
+{/snippet} -->
+
+{#snippet textSelector()}
+  <Input type="text" bind:value={operandValue} />
+{/snippet}
+
 <div class="flex flex-wrap">
   <!-- <any|all> <select metadata key> <operator> <operand> -->
   <ButtonGroup>
@@ -116,7 +176,7 @@
       />
     {/if}
     {#if selectedMetadataKey && selectedMetadataKey.length}
-      {@render keyOperators[metadataKeyValueTypes[selectedMetadataKey]].operandSelector()}
+      {@render keyOperators[selectedMetadataValueType].operandSelector()}
     {:else}
       <!-- TODO show filler -->
     {/if}

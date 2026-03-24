@@ -42,6 +42,7 @@
     DotsVerticalOutline,
     EditOutline,
     ExclamationCircleOutline,
+    FileImportOutline,
     FilterOutline,
     FloppyDiskOutline,
     FolderArrowRightOutline,
@@ -63,7 +64,7 @@
     type RepositoryRecord,
     type RepositoryRecordFilter
   } from '../../../common/types/models'
-  import RepoMetadataFilterBuilder from '../components/RepoMetadataFilterBuilder.svelte'
+  import RecordFilterBuilder from '../components/RecordFilterBuilder.svelte'
 
   let liveRepoConfiguration: RepositoryConfiguration = $state({
     defined: [],
@@ -94,12 +95,13 @@
     string,
     { delay: number; flushing: boolean; snapshot: RecordMetadata }
   > = $state({})
+  let demoFilter: RepositoryRecordFilter = $state(undefined)
   let liveRecordFilters: Record<string, Record<string, RepositoryRecordFilter>> = $state({})
   let liveRecordFiltersList: RepositoryRecordFilter[] = $derived(
     Object.values(liveRecordFilters).flatMap((val) => Object.values(val))
   )
   let displayedRecords: { record: RepositoryRecord; index: number }[] = $derived(
-    filterRecords(liveRepoRecords, liveRecordFiltersList)
+    filterRecords(liveRepoRecords, [...liveRecordFiltersList, demoFilter])
   )
 
   const displayedMetadata: MetadataDescriptor[] = $derived(liveMetadataDescriptors)
@@ -372,7 +374,10 @@
       .filter(({ record }) => {
         let passed = false
         for (const filter of filters) {
-          if (!filter) continue
+          if (!filter) {
+            passed = true
+            continue
+          }
           let currentFilterPassed = filter.predicate(record.metadata[filter.metadataKey] || '')
           passed = currentFilterPassed ? true : passed
           if (filter.must && !currentFilterPassed) return false
@@ -441,33 +446,42 @@
 </Drawer>
 
 <div class="w-full h-full px-4 sm:px-1 pt-4">
-  <div class="mb-2 flex justify-center space-x-1">
-    <RepoMetadataFilterBuilder
+  <div class="mb-2 mx-1 space-x-2 space-y-2 flex flex-wrap justify-end">
+    <RecordFilterBuilder
       metadataDescs={liveMetadataDescriptors}
       onFilterCreated={addFilterForMetadataKey}
+      bind:filter={demoFilter}
     />
+    {#if demoFilter}
+      <Popover>
+        <Badge>{demoFilter.displayName}</Badge>
+      </Popover>
+    {/if}
     <ButtonGroup>
       <Input type="text" placeholder="Identifier" bind:value={createRecordIdentifier} />
       <Button onclick={() => addRecord()} disabled={createDisabled}><PlusOutline /></Button>
     </ButtonGroup>
     <Tooltip>Add Record</Tooltip>
-    <Button
-      outline
-      color="secondary"
-      onclick={() => {
-        importTabularOpen = true
-      }}>Import</Button
-    >
-    <Button
-      outline
-      color="secondary"
-      onclick={() => {
-        editRepoConfigOpen = true
-      }}
-    >
-      <AdjustmentsVerticalOutline />
-      Settings
-    </Button>
+    <div>
+      <Button
+        outline
+        color="secondary"
+        onclick={() => {
+          importTabularOpen = true
+        }}><FileImportOutline /></Button
+      >
+      <Tooltip>Import data from Tabular</Tooltip>
+      <Button
+        outline
+        color="secondary"
+        onclick={() => {
+          editRepoConfigOpen = true
+        }}
+      >
+        <AdjustmentsVerticalOutline />
+      </Button>
+      <Tooltip>Configure Repository</Tooltip>
+    </div>
   </div>
   <div>
     <Table hoverable={true} border={true} class="table-auto">
