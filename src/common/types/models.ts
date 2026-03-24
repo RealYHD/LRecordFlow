@@ -40,6 +40,7 @@ export interface RepositoryRecordFilter {
   displayName: string
   predicate: RepRecordFilterPredicate
   must: boolean
+  identifier: string
 }
 
 export interface RepositoryConfiguration {

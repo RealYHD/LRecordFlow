@@ -15,9 +15,7 @@
     getRecordDirStats,
     attemptLockRecord,
     attemptUnlockRecord,
-    recordExists,
-    getRecordFilterIdentifier,
-    recordFiltersEqual
+    recordExists
   } from '../lib/repo.svelte'
   import {
     Badge,
@@ -57,7 +55,6 @@
   import TabularImport from '../components/TabularRecordImport.svelte'
   import { appStateStore, loadAppState } from '../lib/state.svelte'
   import {
-    MetadataValueType,
     type MetadataDescriptor,
     type RecordDirStatus,
     type RecordLockStatus,
@@ -66,9 +63,7 @@
     type RepositoryRecord,
     type RepositoryRecordFilter
   } from '../../../common/types/models'
-  import TextRecordFilterBuilder from '../components/TextRecordFilterBuilder.svelte'
-  import DateRecordFilterBuilder from '../components/DateRecordFilterBuilder.svelte'
-  import NumberRecordFilterBuilder from '../components/NumberRecordFilterBuilder.svelte'
+  import RepoMetadataFilterBuilder from '../components/RepoMetadataFilterBuilder.svelte'
 
   let liveRepoConfiguration: RepositoryConfiguration = $state({
     defined: [],
@@ -103,7 +98,6 @@
   let liveRecordFiltersList: RepositoryRecordFilter[] = $derived(
     Object.values(liveRecordFilters).flatMap((val) => Object.values(val))
   )
-  let demoRecordFilter: RepositoryRecordFilter | undefined = $state(undefined)
   let displayedRecords: { record: RepositoryRecord; index: number }[] = $derived(
     filterRecords(liveRepoRecords, liveRecordFiltersList)
   )
@@ -343,34 +337,16 @@
     })
   }
 
-  function updateDemoFilterForMetadataKey(filter: RepositoryRecordFilter | undefined): void {
-    // this prevents a recursion with the filter builders calling updated on effect...
-    if (demoRecordFilter && filter && recordFiltersEqual(demoRecordFilter, filter)) return
-    demoRecordFilter = filter
-    let operatingFilters = [...liveRecordFiltersList]
-    if (filter) operatingFilters.push(demoRecordFilter)
-    displayedRecords = filterRecords(liveRepoRecords, operatingFilters)
-    // For some reason, the derivative didn't update when the demoRecordFilter updated
-    // despite being dependent on it, and the demoRecordFilter was a valid state.
-    // Since there is a function updating it, and that is the only time it is being updated,
-    // we use the same function to override the derivative
+  function addFilterForMetadataKey(filter: RepositoryRecordFilter): void {
+    if (!liveRecordFilters[filter.metadataKey]) liveRecordFilters[filter.metadataKey] = {}
+    liveRecordFilters[filter.metadataKey][filter.identifier] = filter
   }
 
-  function addFilterForMetadataKey(
-    recordMetadataKey: string,
-    filter: RepositoryRecordFilter
-  ): void {
-    if (!liveRecordFilters[recordMetadataKey]) liveRecordFilters[recordMetadataKey] = {}
-    liveRecordFilters[recordMetadataKey][getRecordFilterIdentifier(filter)] = filter
-  }
-  function removeFilterForMetadataKey(
-    recordMetadataKey: string,
-    filter: RepositoryRecordFilter
-  ): void {
-    if (!liveRecordFilters[recordMetadataKey]) return
-    delete liveRecordFilters[recordMetadataKey][getRecordFilterIdentifier(filter)]
-    if (Object.entries(liveRecordFilters[recordMetadataKey]).length == 0) {
-      delete liveRecordFilters[recordMetadataKey]
+  function removeFilterForMetadataKey(filter: RepositoryRecordFilter): void {
+    if (!liveRecordFilters[filter.metadataKey]) return
+    delete liveRecordFilters[filter.metadataKey][filter.identifier]
+    if (Object.entries(liveRecordFilters[filter.metadataKey]).length == 0) {
+      delete liveRecordFilters[filter.metadataKey]
     }
   }
 
@@ -466,6 +442,10 @@
 
 <div class="w-full h-full px-4 sm:px-1 pt-4">
   <div class="mb-2 flex justify-center space-x-1">
+    <RepoMetadataFilterBuilder
+      metadataDescs={liveMetadataDescriptors}
+      onFilterCreated={addFilterForMetadataKey}
+    />
     <ButtonGroup>
       <Input type="text" placeholder="Identifier" bind:value={createRecordIdentifier} />
       <Button onclick={() => addRecord()} disabled={createDisabled}><PlusOutline /></Button>
@@ -507,39 +487,14 @@
           {/if}
         </TableHeadCell>
         <TableHeadCell>Identifier</TableHeadCell>
-        {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key, value } (key)}
+        {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key } (key)}
           <TableHeadCell>
             <div class="flex w-fit"><FilterOutline /> <span>{key}</span></div>
-            <Popover
-              title={`Filter on "${key}"`}
-              onclose={() => updateDemoFilterForMetadataKey(undefined)}
-            >
+            <Popover title={`Filter on "${key}"`}>
               <div class="space-y-2">
-                {#if demoRecordFilter}
-                  <Badge>{demoRecordFilter.displayName}</Badge>
-                {/if}
-                {#if value.valueType == MetadataValueType.Date}
-                  <DateRecordFilterBuilder
-                    recordMetadataKey={key}
-                    filterUpdateCallback={updateDemoFilterForMetadataKey}
-                    addPredicateCallback={(filter) => addFilterForMetadataKey(key, filter)}
-                  />
-                {/if}
-                {#if value.valueType == MetadataValueType.Number}
-                  <NumberRecordFilterBuilder
-                    recordMetadataKey={key}
-                    filterUpdateCallback={updateDemoFilterForMetadataKey}
-                    addPredicateCallback={(filter) => addFilterForMetadataKey(key, filter)}
-                  />
-                {/if}
-                <TextRecordFilterBuilder
-                  recordMetadataKey={key}
-                  filterUpdateCallback={updateDemoFilterForMetadataKey}
-                  addPredicateCallback={(filter) => addFilterForMetadataKey(key, filter)}
-                />
                 <div class="ms-4 mb-3 flex">
-                  {#each Object.values(liveRecordFilters[key] || {}) as filter (getRecordFilterIdentifier(filter))}
-                    <Badge dismissable onclose={() => removeFilterForMetadataKey(key, filter)}
+                  {#each Object.values(liveRecordFilters[key] || {}) as filter (filter.identifier)}
+                    <Badge dismissable onclose={() => removeFilterForMetadataKey(filter)}
                       >{filter.displayName}</Badge
                     >
                   {:else}

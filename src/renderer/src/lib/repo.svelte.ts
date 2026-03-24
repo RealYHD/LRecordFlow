@@ -246,15 +246,12 @@ export async function importRepoRecordsFromTabular(
   )
 }
 
-export function getRecordFilterIdentifier(recordFilter: RepositoryRecordFilter): string {
-  return `key:${recordFilter.metadataKey};must:${recordFilter.must};predicate:${recordFilter.predicate.toString()};`
-}
-
 export function recordFiltersEqual(
   filter1: RepositoryRecordFilter,
   filter2: RepositoryRecordFilter
 ) {
   if (!filter1 && filter2) return false
   if (!filter2 && filter1) return false
-  return getRecordFilterIdentifier(filter1) == getRecordFilterIdentifier(filter2)
+  if (!filter2 && !filter1) return true
+  return filter1.identifier == filter2.identifier
 }
