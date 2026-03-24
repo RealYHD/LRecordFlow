@@ -110,10 +110,11 @@
   let liveRecordFiltersList: RepositoryRecordFilter[] = $derived(
     Object.values(liveRecordFilters).flatMap((val) => Object.values(val))
   )
-  let displayedRecords: { record: RepositoryRecord; index: number }[] = $derived(
+  let filteredRecords: { record: RepositoryRecord; index: number }[] = $derived(
     filterRecords(liveRepoRecords, [...liveRecordFiltersList, demoFilter])
   )
-
+  let sortedRecords: { record: RepositoryRecord; index: number }[] = $derived(filteredRecords)
+  let displayedRecords: { record: RepositoryRecord; index: number }[] = $derived(sortedRecords)
   const displayedMetadata: MetadataDescriptor[] = $derived(liveMetadataDescriptors)
   let recordLocks: Record<string, RecordLockStatus | undefined> = $derived(
     Object.fromEntries(
@@ -473,13 +474,14 @@
       {/if}
     </div>
     <div class="w-fit h-fit mb-2 mx-2">
+      <Label>Add Record</Label>
       <ButtonGroup>
         <Input type="text" placeholder="Identifier" bind:value={createRecordIdentifier} />
         <Button onclick={() => addRecord()} disabled={createDisabled}><PlusOutline /></Button>
       </ButtonGroup>
-      <Tooltip>Add Record</Tooltip>
     </div>
     <div class="w-fit h-fit mb-2 mx-2">
+      <Label>Other Operations</Label>
       <ButtonGroup>
         <Button
           id="import-button"
@@ -534,7 +536,10 @@
                 <div class="space-y-2">
                   <div class="mb-3 flex">
                     {#each Object.values(liveRecordFilters['identifier'] || {}) as filter (filter.key)}
-                      <Badge dismissable onclose={() => removeFilterForMetadataKey(filter)}
+                      <Badge
+                        class="m-1"
+                        dismissable
+                        onclose={() => removeFilterForMetadataKey(filter)}
                         >{filter.displayName}</Badge
                       >
                     {:else}
@@ -565,7 +570,10 @@
                   <div class="space-y-2">
                     <div class="mb-3 flex">
                       {#each Object.values(liveRecordFilters[key] || {}) as filter (filter.identifier)}
-                        <Badge dismissable onclose={() => removeFilterForMetadataKey(filter)}
+                        <Badge
+                          class="m-1"
+                          dismissable
+                          onclose={() => removeFilterForMetadataKey(filter)}
                           >{filter.displayName}</Badge
                         >
                       {:else}
