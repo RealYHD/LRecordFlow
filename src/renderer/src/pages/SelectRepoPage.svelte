@@ -1,105 +1,151 @@
 <script lang="ts">
-  import { Button, ButtonGroup, Card, Modal } from 'flowbite-svelte'
   import {
-    DatabaseOutline,
-    FileCloneOutline,
-    FolderArrowRightOutline,
-    TrashBinOutline
-  } from 'flowbite-svelte-icons'
-  import { appStateStore } from '../lib/state.svelte'
+    Button,
+    ButtonGroup,
+    Modal,
+    Table,
+    TableBody,
+    TableBodyCell,
+    TableBodyRow,
+    TableHead,
+    TableHeadCell
+  } from 'flowbite-svelte'
+  import { appStateStore, loadAppState } from '../lib/state.svelte'
+  import { getAllRecordsForRepo, getRepoLastModified } from '../lib/repo.svelte'
+  import { onMount } from 'svelte'
   import { navigate } from '../lib/router.svelte'
-  import CloneGitRepo from '../components/CloneGitRepo.svelte'
-  import { cloneGitRepository } from '../lib/repo.svelte'
-
-  let cloneGitRepoModalOpen = $state(false)
-  let cloneGitRepoValues = $state({
-    name: '',
-    remote: '',
-    local: ''
-  })
-
-  function openRepo(localRepoPath: string): void {
-    appStateStore.state.openedRepoPath = localRepoPath
-    navigate('/repository')
-  }
-
-  function onSubmit({ action }: { action: string }): boolean {
-    // TODO add validation here
-    if (action == 'clone') {
-      cloneGitRepository(
-        cloneGitRepoValues.name,
-        cloneGitRepoValues.remote,
-        cloneGitRepoValues.local
-      )
+  import { TrashBinOutline } from 'flowbite-svelte-icons'
+  import AddRepository from '../components/AddRepository.svelte'
+  let repos: Record<
+    string,
+    {
+      name: string | undefined
+      lastModified: string | undefined
+      recordCount: number | undefined
     }
-    return true
+  > = $state({})
+
+  let addRepositoryModalOpen: boolean = $state(false)
+
+  function loadRepos(): void {
+    repos = {}
+    for (const repo of appStateStore.state.knownRepos) {
+      let repoInfo = {
+        name: repo.name,
+        lastModified: undefined,
+        recordCount: undefined
+      }
+      let promises: Promise<void>[] = []
+      promises.push(
+        getRepoLastModified(repo.local).then((lastModified) => {
+          if (lastModified) {
+            repoInfo.lastModified = lastModified.toLocaleString()
+          } else {
+            repoInfo.lastModified = 'Unavailable'
+          }
+        })
+      )
+      promises.push(
+        getAllRecordsForRepo(repo.local).then((records) => {
+          repoInfo.recordCount = records.length
+        })
+      )
+      Promise.all(promises).then(() => {
+        repos[repo.local] = repoInfo
+      })
+    }
   }
+
+  onMount(() => {
+    loadAppState().then(() => {
+      loadRepos()
+    })
+  })
 </script>
 
-<Modal
-  title="Clone Repository"
-  class="w-80"
-  form
-  bind:open={cloneGitRepoModalOpen}
-  onaction={onSubmit}
->
-  <CloneGitRepo
-    bind:nameInputValue={cloneGitRepoValues.name}
-    bind:remoteInputValue={cloneGitRepoValues.remote}
-    bind:localInputValue={cloneGitRepoValues.local}
-  />
-  {#snippet footer()}
-    <Button type="submit" class="btn btn-neutral mt-4" value="clone">Clone Repository</Button>
-  {/snippet}
+<Modal bind:open={addRepositoryModalOpen}>
+  <div>
+    <div class="mb-4">
+      <span>Add Repository</span>
+    </div>
+    <div>
+      <AddRepository
+        addRepositoryPath={(name, path) => {
+          appStateStore.state.knownRepos.push({
+            name: name,
+            local: path
+          })
+          addRepositoryModalOpen = false
+          loadRepos()
+        }}
+      />
+    </div>
+  </div>
 </Modal>
 
-<div class="p-4 overflow-y-auto">
-  <h1 class="text-3xl mb-4">Repositories</h1>
-  <div class="flex flex-wrap">
-    <Card class="m-1 p-4 sm:p-6  md:p-8 w-90 min-w-90">
-      <div class="flex flex-col h-full justify-between">
-        <div>
-          <FileCloneOutline class="shrink-0 h-8 w-8" />
-          <h2 class="my-2 text-2xl tracking-tight text-gray-900 dark:text-white">
-            Clone/Add Repository
-          </h2>
-          <p class="mb-3 font-normal text-gray-500 dark:text-gray-400">
-            Clone a repository from a remote location for viewing and editing.
-          </p>
-        </div>
-        <ButtonGroup class="w-fit">
-          <Button onclick={() => (cloneGitRepoModalOpen = true)}>Clone</Button>
-          <Button>Add</Button>
-        </ButtonGroup>
-      </div>
-    </Card>
-    {#each appStateStore.state.knownRepos as repo (repo.local)}
-      <Card
-        class="m-1 p-4 sm:p-6 md:p-8 w-90 min-w-90"
-        color={repo.local == appStateStore.state.openedRepoPath ? 'lime' : 'gray'}
-      >
-        <DatabaseOutline class="shrink-0 h-8 w-8" />
-        <h2 class="my-2 text-2xl tracking-tight text-gray-900 dark:text-white">
-          {repo.name}
-        </h2>
-        <ul class="mb-3 font-normal text-gray-500 dark:text-gray-400">
-          <li>Last accessed: {repo.lastAccessed}</li>
-          <li class="overflow-hidden text-ellipsis text-nowrap">Remote: {repo.remote}</li>
-          <li class="overflow-hidden text-ellipsis text-nowrap">Local: {repo.local}</li>
-          <li class="overflow-hidden text-ellipsis text-nowrap">
-            Status: <strong>{repo.status}</strong>
-          </li>
-        </ul>
-        <ButtonGroup class="w-fit">
-          <Button
-            onclick={() => {
-              openRepo(repo.local)
-            }}>Open</Button
-          >
-          <Button><TrashBinOutline class="shrink-0" /></Button>
-          <Button><FolderArrowRightOutline class="shrink-0" /></Button>
-        </ButtonGroup>
-      </Card>
-    {/each}
+<div class="mx-4">
+  <div class="my-2">
+    <Button onclick={() => (addRepositoryModalOpen = true)}>Add Repository</Button>
   </div>
+  <Table shadow>
+    <TableHead>
+      <TableHeadCell>Actions</TableHeadCell>
+      <TableHeadCell>Name</TableHeadCell>
+      <TableHeadCell>Last Modified</TableHeadCell>
+      <TableHeadCell>Path</TableHeadCell>
+      <TableHeadCell>Record Count</TableHeadCell>
+    </TableHead>
+    <TableBody>
+      {#each Object.entries(repos).toSorted(([, repoA], [, repoB]) => Date.parse(repoA.lastModified) - Date.parse(repoB.lastModified)) as [localPath, repo], index (index)}
+        <TableBodyRow>
+          <TableBodyCell>
+            <ButtonGroup size="sm">
+              <Button
+                onclick={() => {
+                  appStateStore.state.openedRepoPath = localPath
+                  navigate('/repository')
+                }}
+              >
+                {#if appStateStore.state.openedRepoPath == localPath}
+                  View
+                {:else}
+                  Open
+                {/if}
+              </Button>
+              <Button
+                onclick={() => {
+                  appStateStore.state.openedRepoPath = undefined
+                  appStateStore.state.knownRepos.splice(index, 1)
+                  loadRepos()
+                }}><TrashBinOutline /></Button
+              >
+            </ButtonGroup>
+          </TableBodyCell>
+          <TableBodyCell>
+            {repo.name}
+          </TableBodyCell>
+          <TableBodyCell>
+            {#if repo.lastModified != undefined}
+              {repo.lastModified}
+            {:else}
+              Loading...
+            {/if}
+          </TableBodyCell>
+          <TableBodyCell>{localPath}</TableBodyCell>
+          <TableBodyCell>
+            {#if repo.recordCount != undefined}
+              {repo.recordCount}
+            {:else}
+              Loading...
+            {/if}
+          </TableBodyCell>
+        </TableBodyRow>
+      {/each}
+    </TableBody>
+  </Table>
+  {#if Object.entries(repos).length == 0}
+    <div class="w-fit my-2 mx-auto">
+      <span class="text-sm">No known repositories! Add one to get started!</span>
+    </div>
+  {/if}
 </div>

@@ -9,6 +9,10 @@ import {
   type RepositoryRecordFilter
 } from '../../../common/types/models'
 
+export async function repoExists(localRepoPath: string) {
+  return await window['repo'].repoExists(localRepoPath)
+}
+
 export function recordDataIsEqual(record1: RecordMetadata, record2: RecordMetadata) {
   if (record1 == record2) return true
   if (!record1) return false
@@ -60,26 +64,6 @@ export function aggregateMetadataDescriptors(
     }
   }
   return descriptors
-}
-
-export function cloneGitRepository(name: string, remote: string, local: string): void {
-  appStateStore.state.knownRepos.push({
-    name: name,
-    remote: remote,
-    local: local,
-    lastAccessed: new Date(),
-    status: 'Not Ready'
-  })
-  window['repo']
-    .cloneGitRepository(remote, local, name)
-    .then((clonePath: string) => {
-      let repo = appStateStore.state.knownRepos.find((repo) => repo.local == local)
-      repo.status = 'Ready'
-      repo.local = clonePath
-    })
-    .catch((err) => {
-      appStateStore.state.knownRepos.find((repo) => repo.local == local).status = 'Not Ready'
-    })
 }
 
 export async function deleteRecord(localRepoPath: string, recordIdentifier: string) {
@@ -266,4 +250,8 @@ export function recordFiltersEqual(
   if (!filter2 && filter1) return false
   if (!filter2 && !filter1) return true
   return filter1.identifier == filter2.identifier
+}
+
+export async function getRepoLastModified(localRepoPath: string): Promise<Date | null> {
+  return await window['repo'].getRepoLastModified(localRepoPath)
 }

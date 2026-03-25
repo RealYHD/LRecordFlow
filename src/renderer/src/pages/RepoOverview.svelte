@@ -105,7 +105,7 @@
   let recordStatTimer = $state(recordStatInterval)
   let retrievingRecordStats = $state(false)
   const liveRecordDirStats: Record<string, PathStatus> = $state({})
-  let liveConfFileStats: PathStatus = $state(undefined)
+  let liveRepoConfFileStats: PathStatus = $state(undefined)
   const persistedRecordMetadata: Record<string, RecordMetadata> = $state({})
   const modifiedRecords: SvelteSet<string> = $derived(
     calcModifiedRecords(liveRepoRecords, persistedRecordMetadata)
@@ -398,7 +398,7 @@
     }
     promises.push(
       statRepoConfig(appStateStore.state.openedRepoPath).then((stat) => {
-        liveConfFileStats = stat
+        liveRepoConfFileStats = stat
       })
     )
     Promise.all(promises).then(() => {
@@ -603,7 +603,7 @@
       >
       <Button
         id="repo-configure-button"
-        disabled={liveConfFileStats ? liveConfFileStats.lockStatus != null : true}
+        disabled={liveRepoConfFileStats ? liveRepoConfFileStats.lockStatus != null : true}
         onclick={() => {
           attemptLockRepoConfig(appStateStore.state.openedRepoPath).then((success) => {
             if (success) {
@@ -618,8 +618,8 @@
       </Button>
       <Tooltip triggeredBy="#import-button">Import data from Tabular</Tooltip>
       <Tooltip triggeredBy="#repo-configure-button">
-        {#if liveConfFileStats ? liveConfFileStats.lockStatus != null : true}
-          Waiting for {liveConfFileStats.lockStatus.currentUser} to Finish Editing...
+        {#if liveRepoConfFileStats ? liveRepoConfFileStats.lockStatus != null : true}
+          Waiting for {liveRepoConfFileStats.lockStatus.currentUser} to Finish Editing...
         {:else}
           Configure Repository
         {/if}
@@ -627,7 +627,7 @@
     </div>
   </div>
   <div>
-    {@render tableStats()}
+    {@render tableNavigation()}
     <Table hoverable={true} border={true} class="table-auto">
       <TableHead class="normal-case">
         <TableHeadCell class="w-fit">
@@ -751,13 +751,13 @@
         {/each}
       </TableBody>
     </Table>
-    {@render tableStats()}
+    {@render tableNavigation()}
   </div>
 </div>
 
-{#snippet tableStats()}
-  <div class="pl-1 font-light text-sm mx-auto w-fit my-2">
-    <div class="w-fit mb-2">
+{#snippet tableNavigation()}
+  <div class="pl-1 mx-auto w-fit my-2">
+    <div class="w-fit mb-2 font-light text-sm ">
       Displaying {displayedRecords.length} records out of {liveRepoRecords.length}. Showing maximum
       of {maxPerPage}
       per page. Currently on page {currentPage} of {totalPages}.

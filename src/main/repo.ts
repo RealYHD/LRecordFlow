@@ -271,10 +271,7 @@ export async function repoExists(localRepoPath: string) {
   } catch (error) {
     return false
   }
-  return (
-    (await stat(localRepoPath)).isDirectory() &&
-    (await simpleGit({ baseDir: localRepoPath }).checkIsRepo())
-  )
+  return (await stat(localRepoPath)).isDirectory()
 }
 
 export async function getAllRepoRecords(localRepoPath: string): Promise<string[]> {

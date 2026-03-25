@@ -1,42 +1,5 @@
 import { SvelteMap } from 'svelte/reactivity'
-
-export interface Repository {
-  name: string
-  remote: string
-  local: string
-  lastAccessed: Date
-  status: 'Ready' | 'Not Ready'
-}
-
-export interface NotificationDescriptor {
-  title: string
-  date: Date
-  status: 'Information' | 'Alert'
-  message: string
-}
-
-export interface AppState {
-  knownRepos: Repository[]
-  openedRepoPath: string | null
-  ongoingProcesses: Record<string, ProcessDescriptor>
-}
-
-export interface PromiseDescriptor {
-  id: string
-  title: string
-  promise: Promise<any>
-  status: string
-  startTime: Date
-  endTime: Date | null
-}
-
-export interface ProcessDescriptor {
-  title: string
-  pid: number
-  status: string
-  startTime: Date
-  endTime: Date | null
-}
+import type { AppState, PromiseDescriptor } from '../../../common/types/models';
 
 export const LoadStatePromiseId = 'Load State'
 
