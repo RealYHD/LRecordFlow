@@ -412,3 +412,7 @@ export async function importRepoRecordsFromTabular(
     })
   })
 }
+
+export async function createRepositoryDirectory(repoPath: string) {
+  return await mkdir(repoPath, { recursive: true })
+}

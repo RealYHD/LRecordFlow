@@ -1,11 +1,15 @@
 <script lang="ts">
   import { Alert, Button, ButtonGroup, Input, Label } from 'flowbite-svelte'
-  import { repoExists } from '../lib/repo.svelte'
-  import { appStateStore } from '../lib/state.svelte'
   import { selectSingleDirectory } from '../lib/dialog.svelte'
 
-  let { addRepositoryPath }: { addRepositoryPath: (name: string, repoPath: string) => void } =
-    $props()
+  let {
+    addRepositoryPath,
+    validateValues
+  }: {
+    addRepositoryPath: (name: string, repoPath: string) => void
+    validateValues: (name: string, repoPath: string) => Promise<string[]>
+  } = $props()
+  let waitingForValidation: boolean = $state(false)
   let repoName: string = $state('')
   let repositoryPath: string = $state('')
   let issues: string[] = $state([])
@@ -38,27 +42,15 @@
     >
   </ButtonGroup>
   <Button
+    disabled={waitingForValidation}
     class="w-fit mx-auto"
     onclick={() => {
+      if (waitingForValidation) return
       issues.length = 0
-      // Validating here...
-      repoExists(repositoryPath).then((dirExists) => {
-        if (repoName.trim().length == 0) {
-          issues.push('Name must be non-blank.')
-        }
-        if (repositoryPath.length == 0) {
-          issues.push('Repository path cannot be blank.')
-        }
-        if (!dirExists) {
-          issues.push(
-            `Could not access "${repositoryPath}". Check if it exists and you have permission to access it.`
-          )
-        }
-        let sameNameRepo = appStateStore.state.knownRepos.find((repo) => repo.name == repoName)
-        if (sameNameRepo != undefined) {
-          issues.push(`"${repoName}" is already in use by repository at "${sameNameRepo.local}".`)
-        }
-
+      waitingForValidation = true
+      validateValues(repoName, repositoryPath).then((results) => {
+        issues.push(...results)
+        waitingForValidation = false
         if (issues.length == 0) {
           addRepositoryPath(repoName, repositoryPath)
         }

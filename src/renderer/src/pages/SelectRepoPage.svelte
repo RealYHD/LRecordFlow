@@ -11,7 +11,7 @@
     TableHeadCell
   } from 'flowbite-svelte'
   import { appStateStore, loadAppState } from '../lib/state.svelte'
-  import { getAllRecordsForRepo, getRepoLastModified } from '../lib/repo.svelte'
+  import { getAllRecordsForRepo, getRepoLastModified, repoExists } from '../lib/repo.svelte'
   import { onMount } from 'svelte'
   import { navigate } from '../lib/router.svelte'
   import { TrashBinOutline } from 'flowbite-svelte-icons'
@@ -56,6 +56,29 @@
     }
   }
 
+  async function validateRepositoryInformation(
+    repoName: string,
+    repoPath: string
+  ): Promise<string[]> {
+    let issues = []
+    if (!(await repoExists(repoPath))) {
+      issues.push(
+        `Could not access "${repoPath}". Check if it exists and you have permission to access it.`
+      )
+    }
+    if (repoName.trim().length == 0) {
+      issues.push('Name must be non-blank.')
+    }
+    if (repoPath.length == 0) {
+      issues.push('Repository path cannot be blank.')
+    }
+    let sameNameRepo = appStateStore.state.knownRepos.find((repo) => repo.name == repoName)
+    if (sameNameRepo != undefined) {
+      issues.push(`"${repoName}" is already in use by repository at "${sameNameRepo.local}".`)
+    }
+    return issues
+  }
+
   onMount(() => {
     loadAppState().then(() => {
       loadRepos()
@@ -78,6 +101,7 @@
           addRepositoryModalOpen = false
           loadRepos()
         }}
+        validateValues={validateRepositoryInformation}
       />
     </div>
   </div>
@@ -86,6 +110,9 @@
 <div class="mx-4">
   <div class="my-2">
     <Button onclick={() => (addRepositoryModalOpen = true)}>Add Repository</Button>
+    <Button onclick={() => (addRepositoryModalOpen = true)} outline color="secondary"
+      >Create Repository</Button
+    >
   </div>
   <Table shadow>
     <TableHead>

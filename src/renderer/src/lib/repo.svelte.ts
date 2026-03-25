@@ -1,4 +1,3 @@
-import { appStateStore } from './state.svelte'
 import {
   MetadataValueType,
   type MetadataDescriptor,
@@ -254,4 +253,8 @@ export function recordFiltersEqual(
 
 export async function getRepoLastModified(localRepoPath: string): Promise<Date | null> {
   return await window['repo'].getRepoLastModified(localRepoPath)
+}
+
+export async function createRepositoryDirectory(repoPath: string): Promise<string> {
+  return await window['repo'].createRepositoryDirectory(repoPath)
 }
