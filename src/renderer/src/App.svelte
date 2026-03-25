@@ -15,7 +15,7 @@
 
 <Navbar>
   <NavBrand href={repoOpened ? p('/repository') : p('/')}>
-    <span class="px-2"><img src={logo} class="w-auto h-8" /></span>
+    <span class="px-2"><img src={logo} class="w-auto h-8" alt="LRepoFlow logo" /></span>
     {#if repoOpened}
       <span class="self-center text-xl font-semibold whitespace-nowrap dark:text-white"
         >{appStateStore.state.knownRepos.find(
@@ -24,7 +24,7 @@
       >
     {:else}
       <span class="self-center text-xl font-semibold whitespace-nowrap dark:text-white"
-        >lRecordFlow</span
+        >LRecordFlow</span
       >
     {/if}
   </NavBrand>
