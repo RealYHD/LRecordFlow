@@ -8,13 +8,19 @@
     TableBodyCell,
     TableBodyRow,
     TableHead,
-    TableHeadCell
+    TableHeadCell,
+    Tooltip
   } from 'flowbite-svelte'
   import { appStateStore, loadAppState } from '../lib/state.svelte'
-  import { getAllRecordsForRepo, getRepoLastModified, repoExists } from '../lib/repo.svelte'
+  import {
+    getAllRecordsForRepo,
+    getRepoLastModified,
+    openRepoDirectory,
+    repoExists
+  } from '../lib/repo.svelte'
   import { onMount } from 'svelte'
   import { navigate } from '../lib/router.svelte'
-  import { TrashBinOutline } from 'flowbite-svelte-icons'
+  import { FolderArrowRightOutline, TrashBinOutline } from 'flowbite-svelte-icons'
   import AddRepository from '../components/AddRepository.svelte'
   let repos: Record<
     string,
@@ -140,13 +146,21 @@
                 {/if}
               </Button>
               <Button
+                id={`delete-${index}-dir-btn`}
                 onclick={() => {
                   appStateStore.state.openedRepoPath = undefined
                   appStateStore.state.knownRepos.splice(index, 1)
                   loadRepos()
                 }}><TrashBinOutline /></Button
               >
+              <Button id={`open-${index}-dir-btn`} onclick={() => openRepoDirectory(localPath)}
+                ><FolderArrowRightOutline /></Button
+              >
             </ButtonGroup>
+            <Tooltip triggeredBy={`#delete-${index}-dir-btn`}
+              >Delete Repository (Directory will not be deleted)</Tooltip
+            >
+            <Tooltip triggeredBy={`#open-${index}-dir-btn`}>Open Repository Directory</Tooltip>
           </TableBodyCell>
           <TableBodyCell>
             {repo.name}

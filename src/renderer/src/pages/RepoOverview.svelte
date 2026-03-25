@@ -516,58 +516,8 @@
   />
 </Drawer>
 
-{#snippet columnHeaderDisplay(key: string, displayName: string)}
-  <div class="flex items-center">
-    <Button
-      class="py-1! px-2! m-1 border-0"
-      outline
-      size="xs"
-      onclick={() => {
-        if (liveSortingColumns[key] == undefined) liveSortingColumns[key] = true
-        else if (liveSortingColumns[key] == true) liveSortingColumns[key] = false
-        else if (liveSortingColumns[key] == false) delete liveSortingColumns[key]
-      }}
-      >{key}
-      <span class="pl-1 w-fit h-fit">
-        {#if liveSortingColumns[key] != undefined}
-          {#if liveSortingColumns[key]}
-            <AngleUpOutline size="xs" />
-          {:else}
-            <AngleDownOutline size="xs" />
-          {/if}
-        {/if}
-      </span>
-    </Button>
-    {#if liveRecordFilters[key] || (demoFilter && demoFilter.key == key)}
-      <span class="relative"><FilterOutline color="orange" /> </span>
-      <Popover title={`Filter on "${displayName}"`}>
-        <div class="space-y-2">
-          <div class="mb-3 flex">
-            {#each Object.values(liveRecordFilters[key] || {}) as filter (filter.identifier)}
-              <Badge class="m-1" dismissable onclose={() => removeFilterForMetadataKey(filter)}
-                >{filter.displayName}</Badge
-              >
-            {:else}
-              <span class="font-light text-sm">No filters added!</span>
-            {/each}
-          </div>
-          <div class="flex">
-            <Button
-              size="xs"
-              class="p-1!"
-              color="alternative"
-              disabled={!liveRecordFilters[key]}
-              onclick={() => (liveRecordFilters[key] = {})}>Clear Filters</Button
-            >
-          </div>
-        </div>
-      </Popover>
-    {/if}
-  </div>
-{/snippet}
-
 <div class="w-full h-full px-4 sm:px-1 pt-4">
-  <div class="mb-2 mx-1 flex flex-wrap justify-end items-end">
+  <div class="mb-2 mx-1 flex flex-wrap justify-between items-end">
     <div class="w-fit h-fit mb-2 mx-2">
       <Label>Filter Configuration</Label>
       <RecordFilterBuilder
@@ -581,49 +531,51 @@
         </Popover>
       {/if}
     </div>
-    <div class="w-fit h-fit mb-2 mx-2">
-      <Label>Add Record</Label>
-      <ButtonGroup>
-        <Input type="text" placeholder="Identifier" bind:value={createRecordIdentifier} />
-        <Button onclick={() => addRecord()} disabled={createDisabled}><PlusOutline /></Button>
-      </ButtonGroup>
-    </div>
-    <div class="w-fit h-fit mb-2 mx-2">
-      <Label>Max Records Per Page</Label>
-      <ButtonGroup>
-        <Input type="number" bind:value={maxPerPage} />
-      </ButtonGroup>
-    </div>
-    <div class="w-fit h-fit mb-2 mx-2">
-      <Button
-        id="import-button"
-        onclick={() => {
-          importTabularOpen = true
-        }}><FileImportOutline /></Button
-      >
-      <Button
-        id="repo-configure-button"
-        disabled={liveRepoConfFileStats ? liveRepoConfFileStats.lockStatus != null : true}
-        onclick={() => {
-          attemptLockRepoConfig(appStateStore.state.openedRepoPath).then((success) => {
-            if (success) {
-              editRepoConfigOpen = true
-            } else {
-              // TODO display error about it being locked
-            }
-          })
-        }}
-      >
-        <AdjustmentsVerticalOutline />
-      </Button>
-      <Tooltip triggeredBy="#import-button">Import data from Tabular</Tooltip>
-      <Tooltip triggeredBy="#repo-configure-button">
-        {#if liveRepoConfFileStats ? liveRepoConfFileStats.lockStatus != null : true}
-          Waiting for {liveRepoConfFileStats.lockStatus.currentUser} to Finish Editing...
-        {:else}
-          Configure Repository
-        {/if}
-      </Tooltip>
+    <div class="flex flex-wrap items-end">
+      <div class="w-fit h-fit mb-2 mx-2">
+        <Label>Add Record</Label>
+        <ButtonGroup>
+          <Input type="text" placeholder="Identifier" bind:value={createRecordIdentifier} />
+          <Button onclick={() => addRecord()} disabled={createDisabled}><PlusOutline /></Button>
+        </ButtonGroup>
+      </div>
+      <div class="w-fit h-fit mb-2 mx-2">
+        <Label>Max Records Per Page</Label>
+        <ButtonGroup>
+          <Input type="number" bind:value={maxPerPage} />
+        </ButtonGroup>
+      </div>
+      <div class="w-fit h-fit mb-2 mx-2">
+        <Button
+          id="import-button"
+          onclick={() => {
+            importTabularOpen = true
+          }}><FileImportOutline /></Button
+        >
+        <Button
+          id="repo-configure-button"
+          disabled={liveRepoConfFileStats ? liveRepoConfFileStats.lockStatus != null : true}
+          onclick={() => {
+            attemptLockRepoConfig(appStateStore.state.openedRepoPath).then((success) => {
+              if (success) {
+                editRepoConfigOpen = true
+              } else {
+                // TODO display error about it being locked
+              }
+            })
+          }}
+        >
+          <AdjustmentsVerticalOutline />
+        </Button>
+        <Tooltip triggeredBy="#import-button">Import data from Tabular</Tooltip>
+        <Tooltip triggeredBy="#repo-configure-button">
+          {#if liveRepoConfFileStats ? liveRepoConfFileStats.lockStatus != null : true}
+            Waiting for {liveRepoConfFileStats.lockStatus.currentUser} to Finish Editing...
+          {:else}
+            Configure Repository
+          {/if}
+        </Tooltip>
+      </div>
     </div>
   </div>
   <div>
@@ -637,10 +589,10 @@
               >Validation failed for {Object.keys(displayedRecordIssueCount).length} (unsaved) records</Tooltip
             >
           {:else if modifiedRecords.size && Object.keys(recordFlushTimers).length}
-            <FloppyDiskOutline />
+            <FloppyDiskOutline color="yellow" />
             <Tooltip>{modifiedRecords.size} records still pending saving...</Tooltip>
           {:else}
-            <ClipboardCheckOutline />
+            <ClipboardCheckOutline color="green" />
             <Tooltip>Everything looks good and is saved!</Tooltip>
           {/if}
         </TableHeadCell>
@@ -659,18 +611,18 @@
           <TableBodyRow class="border-gray-200">
             <TableBodyCell>
               {#if displayedRecordIssueCount[identifier]}
-                <ExclamationCircleOutline color="red" class="shrink-0" />
+                <ExclamationCircleOutline color="red" />
                 <Tooltip>
                   {displayedRecordIssueCount[identifier]} issue(s) found with metadata associated with
                   this record. Updates will not be saved until fixed.
                 </Tooltip>
               {:else if modifiedRecords.has(identifier) && recordFlushTimers[identifier]}
-                <FloppyDiskOutline color="primary" class="shrink-0" />
+                <FloppyDiskOutline color="cyan" />
                 <Tooltip>
-                  Saving record in {(recordFlushTimers[identifier].delay / 1000).toFixed(1)} seconds...
+                  Saving record in {(recordFlushTimers[identifier].delay / 1000).toFixed(0)} seconds...
                 </Tooltip>
               {:else if recordLocks[identifier]}
-                <ChalkboardUserOutline color="cyan" />
+                <ChalkboardUserOutline color="purple" />
                 <Tooltip>
                   The record cannot be modified at this time as {liveRecordDirStats[identifier]
                     .lockStatus.currentUser} is editing this record.
@@ -757,7 +709,7 @@
 
 {#snippet tableNavigation()}
   <div class="pl-1 mx-auto w-fit my-2">
-    <div class="w-fit mb-2 font-light text-sm ">
+    <div class="w-fit mb-2 font-light text-sm">
       Displaying {displayedRecords.length} records out of {liveRepoRecords.length}. Showing maximum
       of {maxPerPage}
       per page. Currently on page {currentPage} of {totalPages}.
@@ -774,5 +726,55 @@
         {/snippet}
       </PaginationNav>
     </div>
+  </div>
+{/snippet}
+
+{#snippet columnHeaderDisplay(key: string, displayName: string)}
+  <div class="flex items-center">
+    <Button
+      class="py-1! px-2! m-1 border-0"
+      outline
+      size="xs"
+      onclick={() => {
+        if (liveSortingColumns[key] == undefined) liveSortingColumns[key] = true
+        else if (liveSortingColumns[key] == true) liveSortingColumns[key] = false
+        else if (liveSortingColumns[key] == false) delete liveSortingColumns[key]
+      }}
+      >{key}
+      <span class="pl-1 w-fit h-fit">
+        {#if liveSortingColumns[key] != undefined}
+          {#if liveSortingColumns[key]}
+            <AngleUpOutline size="xs" />
+          {:else}
+            <AngleDownOutline size="xs" />
+          {/if}
+        {/if}
+      </span>
+    </Button>
+    {#if liveRecordFilters[key] || (demoFilter && demoFilter.key == key)}
+      <span class="relative"><FilterOutline color="orange" /> </span>
+      <Popover title={`Filter on "${displayName}"`}>
+        <div class="space-y-2">
+          <div class="mb-3 flex">
+            {#each Object.values(liveRecordFilters[key] || {}) as filter (filter.identifier)}
+              <Badge class="m-1" dismissable onclose={() => removeFilterForMetadataKey(filter)}
+                >{filter.displayName}</Badge
+              >
+            {:else}
+              <span class="font-light text-sm">No filters added!</span>
+            {/each}
+          </div>
+          <div class="flex">
+            <Button
+              size="xs"
+              class="p-1!"
+              color="alternative"
+              disabled={!liveRecordFilters[key]}
+              onclick={() => (liveRecordFilters[key] = {})}>Clear Filters</Button
+            >
+          </div>
+        </div>
+      </Popover>
+    {/if}
   </div>
 {/snippet}
