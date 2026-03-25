@@ -3,11 +3,10 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerIPCHandleRetriever, registerIPCHandles } from './IpcIndexer'
-import * as repo from "./repo"
-import * as state from "./state"
-import * as dialog from "./dialog"
-import * as tabular from "./tabular"
-
+import * as repo from './repo'
+import * as state from './state'
+import * as dialog from './dialog'
+import * as tabular from './tabular'
 
 function createWindow(): void {
   // Create the browser window.
@@ -45,10 +44,8 @@ function createWindow(): void {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
-
   // Set app user model id for windows
-  electronApp.setAppUserModelId('me.realyhd.reporecords')
-
+  electronApp.setAppUserModelId('me.realyhd.lrecordflow')
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
@@ -57,15 +54,11 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
-
   // Register Entire Module IPCs
-  registerIPCHandles(repo, "repo")
-  registerIPCHandles(state, "state")
-  registerIPCHandles(dialog, "dialog")
-  registerIPCHandles(tabular, "tabular")
+  registerIPCHandles(repo, 'repo')
+  registerIPCHandles(state, 'state')
+  registerIPCHandles(dialog, 'dialog')
+  registerIPCHandles(tabular, 'tabular')
   registerIPCHandleRetriever()
   createWindow()
 

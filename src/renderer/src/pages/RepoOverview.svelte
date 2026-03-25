@@ -80,9 +80,9 @@
     defined: [],
     exactKeys: false
   })
-  let liveRepoRecords: RepositoryRecord[] = $state([])
+  let liveLRecordFlow: RepositoryRecord[] = $state([])
   let liveMetadataDescriptors: MetadataDescriptor[] = $derived(
-    aggregateMetadataDescriptors(liveRepoRecords, liveRepoConfiguration)
+    aggregateMetadataDescriptors(liveLRecordFlow, liveRepoConfiguration)
   )
   let liveColumns: { displayName: string; key: string; valueType: MetadataValueType }[] = $derived([
     { displayName: 'Identifier', key: 'identifier', valueType: MetadataValueType.Text },
@@ -92,8 +92,8 @@
       valueType: value.value.valueType
     }))
   ])
-  let liveRepoRecordsById: Record<string, RepositoryRecord> = $derived(
-    Object.fromEntries(liveRepoRecords.map((recordData) => [recordData.identifier, recordData]))
+  let liveLRecordFlowById: Record<string, RepositoryRecord> = $derived(
+    Object.fromEntries(liveLRecordFlow.map((recordData) => [recordData.identifier, recordData]))
   )
 
   let flushIntervalTimerId = -1
@@ -108,7 +108,7 @@
   let liveRepoConfFileStats: PathStatus = $state(undefined)
   const persistedRecordMetadata: Record<string, RecordMetadata> = $state({})
   const modifiedRecords: SvelteSet<string> = $derived(
-    calcModifiedRecords(liveRepoRecords, persistedRecordMetadata)
+    calcModifiedRecords(liveLRecordFlow, persistedRecordMetadata)
   )
   const recordFlushTimers: Record<
     string,
@@ -122,9 +122,9 @@
   let liveSortingColumns: Record<string, boolean> = $state({})
   let maxPerPage: number = $state(25)
   let currentPage: number = $state(1)
-  let totalPages: number = $derived(Math.ceil(liveRepoRecords.length / maxPerPage))
+  let totalPages: number = $derived(Math.ceil(liveLRecordFlow.length / maxPerPage))
   let filteredRecords: { record: RepositoryRecord; index: number }[] = $derived(
-    filterRecords(liveRepoRecords, [...liveRecordFiltersList, demoFilter])
+    filterRecords(liveLRecordFlow, [...liveRecordFiltersList, demoFilter])
   )
   let sortedRecords: { record: RepositoryRecord; index: number }[] = $derived.by(() => {
     let orderedRecords = filteredRecords
@@ -188,19 +188,19 @@
 
   let createRecordIdentifier = $state('')
   let createRecordIdentifierError = $derived(
-    validateRecordIdentifier(createRecordIdentifier, Object.keys(liveRepoRecordsById))
+    validateRecordIdentifier(createRecordIdentifier, Object.keys(liveLRecordFlowById))
   )
   let createPending: boolean = $state(false)
   let createDisabled: boolean = $derived(createRecordIdentifierError.length > 0 || createPending)
 
   function addRecord(): void {
     const identifier = $state.snapshot(createRecordIdentifier)
-    liveRepoRecords.push({
+    liveLRecordFlow.push({
       identifier: identifier,
       metadata: {},
       files: []
     })
-    editingLiveIndex = liveRepoRecords.findLastIndex(
+    editingLiveIndex = liveLRecordFlow.findLastIndex(
       (record) => record.identifier == createRecordIdentifier
     ) // probably O(1)?
     editRecord(editingLiveIndex)
@@ -210,7 +210,7 @@
 
   function editRecord(editRecordIndex: number): void {
     editingLiveIndex = editRecordIndex
-    let recordIdentifier = liveRepoRecords[editRecordIndex].identifier
+    let recordIdentifier = liveLRecordFlow[editRecordIndex].identifier
     attemptLockRecord(appStateStore.state.openedRepoPath, recordIdentifier).then((success) => {
       if (success) {
         editRecordDataOpen = true
@@ -221,9 +221,9 @@
   }
 
   function removeRecord(deleteRecordIndex: number): void {
-    const recordIdentifier = liveRepoRecords[deleteRecordIndex].identifier
+    const recordIdentifier = liveLRecordFlow[deleteRecordIndex].identifier
     deleteRecord(appStateStore.state.openedRepoPath, recordIdentifier).then(() => {
-      liveRepoRecords.splice(deleteRecordIndex, 1)
+      liveLRecordFlow.splice(deleteRecordIndex, 1)
       delete persistedRecordMetadata[recordIdentifier]
     })
   }
@@ -247,7 +247,7 @@
   }
 
   function flushRecord(recordIdentifier: string): void {
-    let modifiedRecord = liveRepoRecordsById[recordIdentifier]
+    let modifiedRecord = liveLRecordFlowById[recordIdentifier]
     saveRecord(
       appStateStore.state.openedRepoPath,
       modifiedRecord.identifier,
@@ -258,7 +258,7 @@
       persistedRecordMetadata[modifiedRecord.identifier] = $state.snapshot(modifiedRecord.metadata)
       if (
         !editRecordDataOpen ||
-        liveRepoRecords[editingLiveIndex].identifier != modifiedRecord.identifier
+        liveLRecordFlow[editingLiveIndex].identifier != modifiedRecord.identifier
       ) {
         attemptUnlockRecord(appStateStore.state.openedRepoPath, recordIdentifier).then(
           (success) => {
@@ -288,10 +288,10 @@
   function reloadRecord(...identifiers: string[]): void {
     for (const identifier of identifiers) {
       loadRecordFromRepo(appStateStore.state.openedRepoPath, identifier).then((record) => {
-        if (liveRepoRecordsById[identifier]) {
-          Object.assign(liveRepoRecordsById[identifier], record)
+        if (liveLRecordFlowById[identifier]) {
+          Object.assign(liveLRecordFlowById[identifier], record)
         } else {
-          liveRepoRecords.push(record)
+          liveLRecordFlow.push(record)
         }
         persistedRecordMetadata[identifier] = record.metadata
       })
@@ -335,13 +335,13 @@
       if (recordFlushTimers[modifiedRecordId]) {
         if (
           !recordDataIsEqual(
-            $state.snapshot(liveRepoRecordsById[modifiedRecordId].metadata),
+            $state.snapshot(liveLRecordFlowById[modifiedRecordId].metadata),
             recordFlushTimers[modifiedRecordId].snapshot
           )
         ) {
           recordFlushTimers[modifiedRecordId].delay = recordFlushInterval
           recordFlushTimers[modifiedRecordId].snapshot = $state.snapshot(
-            liveRepoRecordsById[modifiedRecordId].metadata
+            liveLRecordFlowById[modifiedRecordId].metadata
           )
           recordFlushTimers[modifiedRecordId].flushing = false
         } else if (
@@ -358,7 +358,7 @@
       } else {
         recordFlushTimers[modifiedRecordId] = {
           delay: recordFlushInterval,
-          snapshot: $state.snapshot(liveRepoRecordsById[modifiedRecordId].metadata),
+          snapshot: $state.snapshot(liveLRecordFlowById[modifiedRecordId].metadata),
           flushing: false
         }
       }
@@ -374,7 +374,7 @@
           promises.push(
             statRecord(appStateStore.state.openedRepoPath, identifier).then((recordDirStat) => {
               if (recordDirStat.lastModified == null) {
-                let liveRecordIndex = liveRepoRecords.findIndex(
+                let liveRecordIndex = liveLRecordFlow.findIndex(
                   (value) => value.identifier == identifier
                 )
                 if (liveRecordIndex >= 0) {
@@ -477,7 +477,7 @@
 <Modal bind:open={importTabularOpen}>
   <TabularImport
     definedMetadataDescriptors={liveRepoConfiguration.defined}
-    currentRecordsById={liveRepoRecordsById}
+    currentRecordsById={liveLRecordFlowById}
     RecordImportCallback={importTabular}
   />
 </Modal>
@@ -497,8 +497,8 @@
   bind:open={editRecordDataOpen}
   placement="right"
   onclose={() => {
-    let recordId = liveRepoRecords[editingLiveIndex].identifier
-    if (!modifiedRecords.has(liveRepoRecords[editingLiveIndex].identifier)) {
+    let recordId = liveLRecordFlow[editingLiveIndex].identifier
+    if (!modifiedRecords.has(liveLRecordFlow[editingLiveIndex].identifier)) {
       attemptUnlockRecord(appStateStore.state.openedRepoPath, recordId).then((success) => {
         if (success) {
           liveRecordDirStats[recordId].lockStatus = null
@@ -509,7 +509,7 @@
 >
   <EditRecordData
     metadataDescriptors={liveMetadataDescriptors}
-    bind:liveRecords={liveRepoRecords}
+    bind:liveRecords={liveLRecordFlow}
     bind:liveIssues={displayedRecordIssues}
     bind:editRecordIndex={editingLiveIndex}
     refreshRecordFn={reloadRecord}
@@ -710,7 +710,7 @@
 {#snippet tableNavigation()}
   <div class="pl-1 mx-auto w-fit my-2">
     <div class="w-fit mb-2 font-light text-sm">
-      Displaying {displayedRecords.length} records out of {liveRepoRecords.length}. Showing maximum
+      Displaying {displayedRecords.length} records out of {liveLRecordFlow.length}. Showing maximum
       of {maxPerPage}
       per page. Currently on page {currentPage} of {totalPages}.
     </div>

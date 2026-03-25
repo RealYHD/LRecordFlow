@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Button, Label, Select } from 'flowbite-svelte'
-  import { importRepoRecordsFromTabular } from '../lib/repo.svelte'
+  import { importLRecordFlowFromTabular } from '../lib/repo.svelte'
   import { selectSingleFileOfType } from '../lib/dialog.svelte'
   import { previewTabular } from '../lib/tabular.svelte'
   import ConfigureMetadataDescriptors from './ConfigureMetadataDescriptors.svelte'
@@ -152,7 +152,7 @@
               id: $state.snapshot(ImportPromiseDescId),
               title: `Import "${tabularPath}"`,
               startTime: new Date(),
-              promise: importRepoRecordsFromTabular(
+              promise: importLRecordFlowFromTabular(
                 appStateStore.state.openedRepoPath,
                 tabularPath,
                 identifierCol,
