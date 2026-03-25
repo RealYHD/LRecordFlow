@@ -116,7 +116,7 @@
             </ul>
           </div>
         {/if}
-        {#if metadataIssues != null}
+        {#if metadataIssues}
           <div class="w-fit px-4 border-l-2 flex flex-col">
             Issues Found:
             <ul class="flex-1 list-disc list-inside max-h-96 overflow-y-auto">

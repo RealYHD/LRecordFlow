@@ -20,7 +20,7 @@
     <span class="font-medium">Issues Detected!</span>
     <span class="text-sm">The following issues have been found:</span>
     <div>
-      <ul>
+      <ul class="list-disc list-inside">
         {#each issues as issue, index (index)}
           <li>{issue}</li>
         {/each}

@@ -740,7 +740,7 @@
         else if (liveSortingColumns[key] == true) liveSortingColumns[key] = false
         else if (liveSortingColumns[key] == false) delete liveSortingColumns[key]
       }}
-      >{key}
+      >{displayName}
       <span class="pl-1 w-fit h-fit">
         {#if liveSortingColumns[key] != undefined}
           {#if liveSortingColumns[key]}
@@ -770,7 +770,7 @@
               class="p-1!"
               color="alternative"
               disabled={!liveRecordFilters[key]}
-              onclick={() => (liveRecordFilters[key] = {})}>Clear Filters</Button
+              onclick={() => delete liveRecordFilters[key]}>Clear Filters</Button
             >
           </div>
         </div>

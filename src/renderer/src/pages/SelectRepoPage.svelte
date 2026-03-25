@@ -116,9 +116,6 @@
 <div class="mx-4">
   <div class="my-2">
     <Button onclick={() => (addRepositoryModalOpen = true)}>Add Repository</Button>
-    <Button onclick={() => (addRepositoryModalOpen = true)} outline color="secondary"
-      >Create Repository</Button
-    >
   </div>
   <Table shadow>
     <TableHead>

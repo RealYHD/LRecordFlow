@@ -52,7 +52,7 @@
             valueExamples={null}
             maxExamples={10}
             hideMetadataKeys={[]}
-            metadataIssues={{}}
+            metadataIssues={undefined}
           />
         {:else}
           <Span class="mx-auto py-5 px-3">No metadata associated with this record yet!</Span>

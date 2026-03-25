@@ -10,7 +10,7 @@ import { PathStatus, lockStatus } from '../../common/types/models'
 
 const recordMetadataFilename = '.lrf.record.json'
 const repoConfigurationFilename = '.lrf.config.json'
-const lockInfoName = '.lrf.lock-info.json'
+const lockInfoFilename = '.lrf.lock-info.json'
 
 const ignoredRecordExtensions = ['.git', '.lock']
 function getRecordPath(localRepoPath: string, recordIdentifier: string): string {
@@ -115,10 +115,10 @@ export async function attemptLockPath(pathToLock: string): Promise<boolean> {
   let pathIsDir = pathStat.isDirectory()
   let basename = path.basename(pathToLock)
   let lockInfoPath = pathIsDir
-    ? path.join(pathToLock, lockInfoName)
+    ? path.join(pathToLock, lockInfoFilename)
     : path.join(
         path.dirname(pathToLock),
-        (basename.startsWith('.') ? basename : '.' + basename) + lockInfoName
+        (basename.startsWith('.') ? basename : '.' + basename) + lockInfoFilename
       )
   let lockInfo = {
     currentUser: userInfo().username,
@@ -140,10 +140,10 @@ export async function attemptUnlockPath(pathToUnlock: string) {
   let pathIsDir = pathStat.isDirectory()
   let basename = path.basename(pathToUnlock)
   let lockInfoPath = pathIsDir
-    ? path.join(pathToUnlock, lockInfoName)
+    ? path.join(pathToUnlock, lockInfoFilename)
     : path.join(
         path.dirname(pathToUnlock),
-        (basename.startsWith('.') ? basename : '.' + basename) + lockInfoName
+        (basename.startsWith('.') ? basename : '.' + basename) + lockInfoFilename
       )
   try {
     await rm(lockInfoPath, { force: true })
@@ -163,10 +163,10 @@ export async function getPathStats(pathToStat: string): Promise<PathStatus> {
   let pathIsDir = pathStat.isDirectory()
   let basename = path.basename(pathToStat)
   let lockInfoPath = pathIsDir
-    ? path.join(pathToStat, lockInfoName)
+    ? path.join(pathToStat, lockInfoFilename)
     : path.dirname(pathToStat) +
       (basename.startsWith('.') ? basename : '.' + basename) +
-      lockInfoName
+      lockInfoFilename
   let lockStatus: lockStatus = {
     currentUser: userInfo().username,
     lockDate: new Date()
@@ -330,7 +330,10 @@ export async function getFilesAssociatedWithRecord(
       withFileTypes: true
     })
   )
-    .filter((entry) => entry.isFile() && entry.name != recordMetadataFilename)
+    .filter(
+      (entry) =>
+        entry.isFile() && entry.name != recordMetadataFilename && entry.name != lockInfoFilename
+    )
     .map((entry) => entry.name)
 }
 
