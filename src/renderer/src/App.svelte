@@ -3,6 +3,7 @@
   import { Router } from 'sv-router'
   import { p } from './lib/router.svelte'
   import { appStateStore, flush, loadAppState } from './lib/state.svelte'
+  import logo from './assets/icon.png'
   loadAppState()
 
   let repoOpened: boolean = $derived(
@@ -14,6 +15,7 @@
 
 <Navbar>
   <NavBrand href={repoOpened ? p('/repository') : p('/')}>
+    <span class="px-2"><img src={logo} class="w-auto h-8" /></span>
     {#if repoOpened}
       <span class="self-center text-xl font-semibold whitespace-nowrap dark:text-white"
         >{appStateStore.state.knownRepos.find(
@@ -22,7 +24,7 @@
       >
     {:else}
       <span class="self-center text-xl font-semibold whitespace-nowrap dark:text-white"
-        >LRecordFlow</span
+        >lRecordFlow</span
       >
     {/if}
   </NavBrand>

@@ -6,7 +6,7 @@ import Papa from 'papaparse'
 import { createReadStream } from 'fs'
 import { check, lock, unlock } from 'proper-lockfile'
 import { userInfo } from 'os'
-import { PathStatus, lockStatus } from '../common/types/models'
+import { PathStatus, lockStatus } from '../../common/types/models'
 
 const recordMetadataFilename = '.lrf.record.json'
 const repoConfigurationFilename = '.lrf.config.json'

@@ -2,11 +2,11 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { registerIPCHandleRetriever, registerIPCHandles } from './IpcIndexer'
-import * as repo from './repo'
-import * as state from './state'
-import * as dialog from './dialog'
-import * as tabular from './tabular'
+import { registerIPCHandleRetriever, registerIPCHandles } from './lib/IpcIndexer'
+import * as repo from './lib/repo'
+import * as state from './lib/state'
+import * as dialog from './lib/dialog'
+import * as tabular from './lib/tabular'
 
 function createWindow(): void {
   // Create the browser window.
