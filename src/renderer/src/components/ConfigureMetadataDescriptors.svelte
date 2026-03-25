@@ -58,13 +58,13 @@
                 value,
                 name
               }))}
-              bind:value={metadataDescriptors[index].value.valueType}
+              bind:value={descriptor.value.valueType}
             />
           </div>
           <div>
-            <Checkbox bind:checked={metadataDescriptors[index].required}>Required</Checkbox>
+            <Checkbox bind:checked={descriptor.required}>Required</Checkbox>
           </div>
-          {#if metadataDescriptors[index].value.valueType == MetadataValueType.Options}
+          {#if descriptor.value.valueType == MetadataValueType.Options}
             <div class="mt-2 space-y-2">
               <div>
                 <Label>Add option</Label>
@@ -73,22 +73,19 @@
                   <Button
                     onclick={() => {
                       metadataKeyOptionToAdd = ''
-                      metadataDescriptors[index].value.options.push(metadataKeyOptionToAdd)
+                      descriptor.value.options.push(metadataKeyOptionToAdd)
                     }}
-                    disabled={metadataDescriptors[index].value.options.includes(
-                      metadataKeyOptionToAdd
-                    )}><PlusOutline /></Button
+                    disabled={descriptor.value.options.includes(metadataKeyOptionToAdd)}
+                    ><PlusOutline /></Button
                   >
                 </ButtonGroup>
               </div>
               <div class="flex-1 space-y-1 overflow-y-auto max-h-96">
-                {#each { length: metadataDescriptors[index].value.options.length }, optionIndex}
+                {#each { length: descriptor.value.options.length }, optionIndex}
                   <div>
                     <ButtonGroup>
-                      <Input bind:value={metadataDescriptors[index].value.options[optionIndex]} />
-                      <Button
-                        onclick={() =>
-                          metadataDescriptors[index].value.options.splice(optionIndex, 1)}
+                      <Input bind:value={descriptor.value.options[optionIndex]} />
+                      <Button onclick={() => descriptor.value.options.splice(optionIndex, 1)}
                         ><TrashBinOutline /></Button
                       >
                     </ButtonGroup>
