@@ -2,7 +2,7 @@ import { appStateStore } from './state.svelte'
 import {
   MetadataValueType,
   type MetadataDescriptor,
-  type RecordDirStatus,
+  type PathStatus as PathStatus,
   type RecordMetadata,
   type RepositoryConfiguration,
   type RepositoryRecord,
@@ -174,11 +174,23 @@ export async function attemptUnlockRecord(
   return await window['repo'].attemptUnlockRecord(localRepoPath, recordIdentifier)
 }
 
-export async function getRecordDirStats(
+export async function statRecord(
   localRepoPath: string,
   recordIdentifier: string
-): Promise<RecordDirStatus> {
-  return await window['repo'].getRecordDirStats(localRepoPath, recordIdentifier)
+): Promise<PathStatus> {
+  return await window['repo'].statRecord(localRepoPath, recordIdentifier)
+}
+
+export async function attemptLockRepoConfig(localRepoPath: string): Promise<boolean> {
+  return await window['repo'].attemptLockRepoConfig(localRepoPath)
+}
+
+export async function attemptUnlockRepoConfig(localRepoPath: string): Promise<boolean> {
+  return await window['repo'].attemptUnlockRepoConfig(localRepoPath)
+}
+
+export async function statRepoConfig(localRepoPath: string): Promise<PathStatus> {
+  return await window['repo'].statRepoConfig(localRepoPath)
 }
 
 export function validateRecordIdentifier(identifier: string, allIdentifiers: string[]) {

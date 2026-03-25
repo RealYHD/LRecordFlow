@@ -6,11 +6,11 @@ import Papa from 'papaparse'
 import { createReadStream } from 'fs'
 import { check, lock, unlock } from 'proper-lockfile'
 import { userInfo } from 'os'
-import { RecordDirStatus, RecordLockStatus } from '../common/types/models'
+import { PathStatus, lockStatus } from '../common/types/models'
 
 const recordMetadataFilename = '.lrf.record.json'
 const repoConfigurationFilename = '.lrf.config.json'
-const recordLockInfo = '.lrf.lock-info.json'
+const lockInfoName = '.lrf.lock-info.json'
 
 const ignoredRecordExtensions = ['.git', '.lock']
 function getRecordPath(localRepoPath: string, recordIdentifier: string): string {
@@ -86,19 +86,47 @@ export async function recordExists(
   return (await stat(recordDirectory)).isDirectory()
 }
 
-export async function attemptLockRecord(
-  localRepoPath: string,
-  recordIdentifier: string
-): Promise<boolean> {
-  let recordPath = path.join(localRepoPath, recordIdentifier)
-  let recordLockInfoPath = path.join(localRepoPath, recordIdentifier, recordLockInfo)
+export async function attemptLockRecord(localRepoPath: string, recordIdentifier: string) {
+  return await attemptLockPath(path.join(localRepoPath, recordIdentifier))
+}
+
+export async function attemptUnlockRecord(localRepoPath: string, recordIdentifier: string) {
+  return await attemptUnlockPath(path.join(localRepoPath, recordIdentifier))
+}
+
+export async function statRecord(localRepoPath: string, recordIdentifier: string) {
+  return await getPathStats(path.join(localRepoPath, recordIdentifier))
+}
+
+export async function attemptLockRepoConfig(localRepoPath) {
+  return await attemptLockPath(path.join(localRepoPath, repoConfigurationFilename))
+}
+
+export async function attemptUnlockRepoConfig(localRepoPath) {
+  return await attemptUnlockPath(path.join(localRepoPath, repoConfigurationFilename))
+}
+
+export async function statRepoConfig(localRepoPath) {
+  return await getPathStats(path.join(localRepoPath, repoConfigurationFilename))
+}
+
+export async function attemptLockPath(pathToLock: string): Promise<boolean> {
+  let pathStat = await stat(pathToLock)
+  let pathIsDir = pathStat.isDirectory()
+  let basename = path.basename(pathToLock)
+  let lockInfoPath = pathIsDir
+    ? path.join(pathToLock, lockInfoName)
+    : path.join(
+        path.dirname(pathToLock),
+        (basename.startsWith('.') ? basename : '.' + basename) + lockInfoName
+      )
   let lockInfo = {
     currentUser: userInfo().username,
     lockDate: new Date()
   }
   try {
-    await lock(recordPath)
-    await writeFile(recordLockInfoPath, JSON.stringify(lockInfo))
+    await lock(pathToLock)
+    await writeFile(lockInfoPath, JSON.stringify(lockInfo))
     return true
   } catch (error) {
     // TODO check if it exists, if not, return generic message
@@ -107,15 +135,22 @@ export async function attemptLockRecord(
   }
 }
 
-export async function attemptUnlockRecord(localRepoPath: string, recordIdentifier: string) {
-  let recordPath = path.join(localRepoPath, recordIdentifier)
-  let recordLockInfoPath = path.join(localRepoPath, recordIdentifier, recordLockInfo)
+export async function attemptUnlockPath(pathToUnlock: string) {
+  let pathStat = await stat(pathToUnlock)
+  let pathIsDir = pathStat.isDirectory()
+  let basename = path.basename(pathToUnlock)
+  let lockInfoPath = pathIsDir
+    ? path.join(pathToUnlock, lockInfoName)
+    : path.join(
+        path.dirname(pathToUnlock),
+        (basename.startsWith('.') ? basename : '.' + basename) + lockInfoName
+      )
   try {
-    await unlock(recordPath)
-    await rm(recordLockInfoPath, { force: true })
+    await rm(lockInfoPath, { force: true })
+    await unlock(pathToUnlock)
     return true
   } catch (error) {
-    if (await check(recordPath)) {
+    if (await check(pathToUnlock)) {
       throw error
     } else {
       return false
@@ -123,34 +158,57 @@ export async function attemptUnlockRecord(localRepoPath: string, recordIdentifie
   }
 }
 
-export async function getRecordDirStats(
-  localRepoPath: string,
-  recordIdentifier: string
-): Promise<RecordDirStatus> {
-  let recordPath = path.join(localRepoPath, recordIdentifier)
-  let recordLockInfoPath = path.join(localRepoPath, recordIdentifier, recordLockInfo)
-  let lockStatus: RecordLockStatus = {
+export async function getPathStats(pathToStat: string): Promise<PathStatus> {
+  let pathStat = await stat(pathToStat)
+  let pathIsDir = pathStat.isDirectory()
+  let basename = path.basename(pathToStat)
+  let lockInfoPath = pathIsDir
+    ? path.join(pathToStat, lockInfoName)
+    : path.dirname(pathToStat) +
+      (basename.startsWith('.') ? basename : '.' + basename) +
+      lockInfoName
+  let lockStatus: lockStatus = {
     currentUser: userInfo().username,
     lockDate: new Date()
   }
   let lastModifiedTime: Date | undefined = undefined
   try {
-    lastModifiedTime = (await stat(recordPath)).mtime
+    lastModifiedTime = (await stat(pathToStat)).mtime
   } catch (error) {
     return { lastModified: null, lockStatus: null }
   }
-  if (await check(recordPath)) {
+  if (await check(pathToStat)) {
     // Has ownership over lock
     try {
-      await access(recordLockInfoPath)
-      lockStatus = JSON.parse(await readFile(recordLockInfoPath, 'utf-8'))
+      await access(lockInfoPath)
+      lockStatus = JSON.parse(await readFile(lockInfoPath, 'utf-8'))
     } catch (error) {
-      await writeFile(recordLockInfoPath, JSON.stringify(lockStatus))
+      await writeFile(lockInfoPath, JSON.stringify(lockStatus))
     }
     return { lastModified: lastModifiedTime, lockStatus: lockStatus }
   } else {
     return { lastModified: lastModifiedTime, lockStatus: null }
   }
+}
+
+export async function getRepoLastModified(localRepoPath: string): Promise<Date | null> {
+  let recordIdentifiers: string[] = await getAllRepoRecords(localRepoPath)
+  let lastModified: Date | null = null
+  for (const recordIdentifier of recordIdentifiers) {
+    let recordStats: PathStatus = await statRecord(localRepoPath, recordIdentifier)
+    if (recordStats.lastModified == null) continue
+    if (lastModified == undefined || recordStats.lastModified > lastModified) {
+      lastModified = recordStats.lastModified
+    }
+  }
+  let repoStat = await statRepoConfig(localRepoPath)
+  if (
+    lastModified == null ||
+    (repoStat.lastModified != null && repoStat.lastModified > lastModified)
+  ) {
+    lastModified = repoStat.lastModified
+  }
+  return lastModified
 }
 
 export async function recordHasMetadata(

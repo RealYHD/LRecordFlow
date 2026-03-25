@@ -12,10 +12,13 @@
     validateRecords,
     getAllRecordsForRepo,
     loadRecordFromRepo,
-    getRecordDirStats,
+    statRecord,
     attemptLockRecord,
     attemptUnlockRecord,
-    recordExists
+    recordExists,
+    statRepoConfig,
+    attemptLockRepoConfig,
+    attemptUnlockRepoConfig
   } from '../lib/repo.svelte'
   import {
     Badge,
@@ -64,8 +67,8 @@
   import {
     MetadataValueType,
     type MetadataDescriptor,
-    type RecordDirStatus,
-    type RecordLockStatus,
+    type PathStatus,
+    type lockStatus,
     type RecordMetadata,
     type RepositoryConfiguration,
     type RepositoryRecord,
@@ -101,7 +104,8 @@
   const recordStatInterval = 0.5 * recordStatTickInterval
   let recordStatTimer = $state(recordStatInterval)
   let retrievingRecordStats = $state(false)
-  const liveRecordStats: Record<string, RecordDirStatus> = $state({})
+  const liveRecordDirStats: Record<string, PathStatus> = $state({})
+  let liveConfFileStats: PathStatus = $state(undefined)
   const persistedRecordMetadata: Record<string, RecordMetadata> = $state({})
   const modifiedRecords: SvelteSet<string> = $derived(
     calcModifiedRecords(liveRepoRecords, persistedRecordMetadata)
@@ -154,11 +158,13 @@
     sortedRecords.slice((currentPage - 1) * maxPerPage, currentPage * maxPerPage)
   )
   const displayedMetadata: MetadataDescriptor[] = $derived(liveMetadataDescriptors)
-  let recordLocks: Record<string, RecordLockStatus | undefined> = $derived(
+  let recordLocks: Record<string, lockStatus | undefined> = $derived(
     Object.fromEntries(
       displayedRecords.map(({ record }) => [
         record.identifier,
-        liveRecordStats[record.identifier] ? liveRecordStats[record.identifier].lockStatus : null
+        liveRecordDirStats[record.identifier]
+          ? liveRecordDirStats[record.identifier].lockStatus
+          : null
       ])
     )
   )
@@ -257,7 +263,7 @@
         attemptUnlockRecord(appStateStore.state.openedRepoPath, recordIdentifier).then(
           (success) => {
             if (success) {
-              liveRecordStats[recordIdentifier].lockStatus = null
+              liveRecordDirStats[recordIdentifier].lockStatus = null
             }
           }
         )
@@ -359,39 +365,42 @@
     }
   }
 
-  function updateRecordDirStats(...identifiers: string[]): void {
+  function updateStats(...identifiers: string[]): void {
     retrievingRecordStats = true
     const promises = []
     for (const identifier of identifiers) {
       recordExists(appStateStore.state.openedRepoPath, identifier).then((recordExists) => {
         if (recordExists) {
           promises.push(
-            getRecordDirStats(appStateStore.state.openedRepoPath, identifier).then(
-              (recordDirStat) => {
-                if (recordDirStat.lastModified == null) {
-                  let liveRecordIndex = liveRepoRecords.findIndex(
-                    (value) => value.identifier == identifier
-                  )
-                  if (liveRecordIndex >= 0) {
-                    removeRecord(liveRecordIndex)
-                  }
-                  return // It was deleted
+            statRecord(appStateStore.state.openedRepoPath, identifier).then((recordDirStat) => {
+              if (recordDirStat.lastModified == null) {
+                let liveRecordIndex = liveRepoRecords.findIndex(
+                  (value) => value.identifier == identifier
+                )
+                if (liveRecordIndex >= 0) {
+                  removeRecord(liveRecordIndex)
                 }
-                if (
-                  (liveRecordStats[identifier] &&
-                    liveRecordStats[identifier].lastModified < recordDirStat.lastModified) ||
-                  !liveRecordStats[identifier]
-                ) {
-                  // TODO this is rather disorganized, and we should probably do this logic somewhere else.
-                  reloadRecord(identifier)
-                }
-                liveRecordStats[identifier] = recordDirStat
+                return // It was deleted
               }
-            )
+              if (
+                (liveRecordDirStats[identifier] &&
+                  liveRecordDirStats[identifier].lastModified < recordDirStat.lastModified) ||
+                !liveRecordDirStats[identifier]
+              ) {
+                // TODO this is rather disorganized, and we should probably do this logic somewhere else.
+                reloadRecord(identifier)
+              }
+              liveRecordDirStats[identifier] = recordDirStat
+            })
           )
         }
       })
     }
+    promises.push(
+      statRepoConfig(appStateStore.state.openedRepoPath).then((stat) => {
+        liveConfFileStats = stat
+      })
+    )
     Promise.all(promises).then(() => {
       retrievingRecordStats = false
       recordStatTimer = recordStatInterval
@@ -416,7 +425,7 @@
     if (recordStatTimer <= 0) {
       recordStatTimer = 0
       if (!retrievingRecordStats) {
-        updateRecordDirStats(...displayedRecords.map(({ record }) => record.identifier))
+        updateStats(...displayedRecords.map(({ record }) => record.identifier))
       }
     }
   }
@@ -478,6 +487,7 @@
   placement="right"
   onclose={() => {
     setRepoConfig(appStateStore.state.openedRepoPath, $state.snapshot(liveRepoConfiguration))
+    attemptUnlockRepoConfig(appStateStore.state.openedRepoPath)
   }}
 >
   <ConfigureRepository bind:repoConfig={liveRepoConfiguration} />
@@ -491,7 +501,7 @@
     if (!modifiedRecords.has(liveRepoRecords[editingLiveIndex].identifier)) {
       attemptUnlockRecord(appStateStore.state.openedRepoPath, recordId).then((success) => {
         if (success) {
-          liveRecordStats[recordId].lockStatus = null
+          liveRecordDirStats[recordId].lockStatus = null
         }
       })
     }
@@ -593,14 +603,27 @@
       >
       <Button
         id="repo-configure-button"
+        disabled={liveConfFileStats ? liveConfFileStats.lockStatus != null : true}
         onclick={() => {
-          editRepoConfigOpen = true
+          attemptLockRepoConfig(appStateStore.state.openedRepoPath).then((success) => {
+            if (success) {
+              editRepoConfigOpen = true
+            } else {
+              // TODO display error about it being locked
+            }
+          })
         }}
       >
         <AdjustmentsVerticalOutline />
       </Button>
       <Tooltip triggeredBy="#import-button">Import data from Tabular</Tooltip>
-      <Tooltip triggeredBy="#repo-configure-button">Define Metadata</Tooltip>
+      <Tooltip triggeredBy="#repo-configure-button">
+        {#if liveConfFileStats ? liveConfFileStats.lockStatus != null : true}
+          Waiting for {liveConfFileStats.lockStatus.currentUser} to Finish Editing...
+        {:else}
+          Configure Repository
+        {/if}
+      </Tooltip>
     </div>
   </div>
   <div>
@@ -649,7 +672,7 @@
               {:else if recordLocks[identifier]}
                 <ChalkboardUserOutline color="cyan" />
                 <Tooltip>
-                  The record cannot be modified at this time as {liveRecordStats[identifier]
+                  The record cannot be modified at this time as {liveRecordDirStats[identifier]
                     .lockStatus.currentUser} is editing this record.
                 </Tooltip>
               {:else}

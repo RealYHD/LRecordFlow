@@ -1,9 +1,9 @@
-export interface RecordDirStatus {
+export interface PathStatus {
   lastModified: Date | null
-  lockStatus: RecordLockStatus | null
+  lockStatus: lockStatus | null
 }
 
-export interface RecordLockStatus {
+export interface lockStatus {
   currentUser: string | null
   lockDate: Date | null
 }
