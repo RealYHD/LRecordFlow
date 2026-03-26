@@ -4,7 +4,7 @@
   import { selectSingleFileOfType } from '../lib/dialog.svelte'
   import { previewTabular } from '../lib/tabular.svelte'
   import ConfigureMetadataDescriptors from './ConfigureMetadataDescriptors.svelte'
-  import { appStateStore, trackPromise } from '../lib/state.svelte'
+  import { isTrackedPromiseDone, openedRepo, trackPromise } from '../lib/state.svelte'
   import {
     MetadataValueType,
     type MetadataDescriptor,
@@ -72,12 +72,7 @@
     // TODO show what records don't conform to current settings
     return {}
   })
-  let working: boolean = $derived(
-    tabularPath.length
-      ? appStateStore.promises.get(ImportPromiseDescId) &&
-          appStateStore.promises.get(ImportPromiseDescId).endTime == null
-      : false
-  )
+  let working: boolean = $derived(isTrackedPromiseDone(ImportPromiseDescId))
 
   function openTabular(path: string): void {
     if (!path.length) return
@@ -148,25 +143,20 @@
           class="w-fit"
           disabled={working}
           onclick={() => {
-            trackPromise({
-              id: $state.snapshot(ImportPromiseDescId),
-              title: `Import "${tabularPath}"`,
-              startTime: new Date(),
-              promise: importLRecordFlowFromTabular(
-                appStateStore.state.openedRepoPath,
+            trackPromise($state.snapshot(ImportPromiseDescId), (message) => {
+              message.title = 'Importing "${tabularPath}"'
+              message.description = 'Importing tabular Dataset'
+              return importLRecordFlowFromTabular(
+                openedRepo.local,
                 tabularPath,
                 identifierCol,
                 pathCols
               ).then((identifiers) => {
-                console.log('adding...')
-                console.log(identifiers)
                 RecordImportCallback(
                   identifiers,
                   metadataDescriptors.filter((desc) => desc.key != identifierCol)
                 )
-              }),
-              status: `Importing "${tabularPath}"`,
-              endTime: null
+              })
             })
           }}>Import</Button
         >

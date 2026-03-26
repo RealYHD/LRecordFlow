@@ -48,7 +48,6 @@
     ChalkboardUserOutline,
     CheckCircleOutline,
     ClipboardCheckOutline,
-    DotsVerticalOutline,
     EditOutline,
     ExclamationCircleOutline,
     FileImportOutline,
@@ -63,7 +62,7 @@
   import ConfigureRepository from '../components/ConfigureRepository.svelte'
   import { SvelteSet } from 'svelte/reactivity'
   import TabularImport from '../components/TabularRecordImport.svelte'
-  import { appStateStore, loadAppState } from '../lib/state.svelte'
+  import { guaranteeConfiguration, openedRepo } from '../lib/state.svelte'
   import {
     MetadataValueType,
     type MetadataDescriptor,
@@ -211,7 +210,7 @@
   function editRecord(editRecordIndex: number): void {
     editingLiveIndex = editRecordIndex
     let recordIdentifier = liveLRecordFlow[editRecordIndex].identifier
-    attemptLockRecord(appStateStore.state.openedRepoPath, recordIdentifier).then((success) => {
+    attemptLockRecord(openedRepo.repo.local, recordIdentifier).then((success) => {
       if (success) {
         editRecordDataOpen = true
       } else {
@@ -222,7 +221,7 @@
 
   function removeRecord(deleteRecordIndex: number): void {
     const recordIdentifier = liveLRecordFlow[deleteRecordIndex].identifier
-    deleteRecord(appStateStore.state.openedRepoPath, recordIdentifier).then(() => {
+    deleteRecord(openedRepo.repo.local, recordIdentifier).then(() => {
       liveLRecordFlow.splice(deleteRecordIndex, 1)
       delete persistedRecordMetadata[recordIdentifier]
     })
@@ -249,7 +248,7 @@
   function flushRecord(recordIdentifier: string): void {
     let modifiedRecord = liveLRecordFlowById[recordIdentifier]
     saveRecord(
-      appStateStore.state.openedRepoPath,
+      openedRepo.repo.local,
       modifiedRecord.identifier,
       $state.snapshot(modifiedRecord.metadata)
     ).then(() => {
@@ -260,13 +259,11 @@
         !editRecordDataOpen ||
         liveLRecordFlow[editingLiveIndex].identifier != modifiedRecord.identifier
       ) {
-        attemptUnlockRecord(appStateStore.state.openedRepoPath, recordIdentifier).then(
-          (success) => {
-            if (success) {
-              liveRecordDirStats[recordIdentifier].lockStatus = null
-            }
+        attemptUnlockRecord(openedRepo.repo.local, recordIdentifier).then((success) => {
+          if (success) {
+            liveRecordDirStats[recordIdentifier].lockStatus = null
           }
-        )
+        })
       }
     })
   }
@@ -280,14 +277,14 @@
 
   function reloadAllRecords(): void {
     flushAllModifiedRecords()
-    getAllRecordsForRepo(appStateStore.state.openedRepoPath).then((identifiers) => {
+    getAllRecordsForRepo(openedRepo.repo.local).then((identifiers) => {
       reloadRecord(...identifiers)
     })
   }
 
   function reloadRecord(...identifiers: string[]): void {
     for (const identifier of identifiers) {
-      loadRecordFromRepo(appStateStore.state.openedRepoPath, identifier).then((record) => {
+      loadRecordFromRepo(openedRepo.repo.local, identifier).then((record) => {
         if (liveLRecordFlowById[identifier]) {
           Object.assign(liveLRecordFlowById[identifier], record)
         } else {
@@ -301,7 +298,7 @@
   function reloadRepoConfiguration(): void {
     liveRepoConfiguration.defined = []
     liveRepoConfiguration.exactKeys = false
-    getRepoConfig(appStateStore.state.openedRepoPath).then((loadedConfig) => {
+    getRepoConfig(openedRepo.repo.local).then((loadedConfig) => {
       Object.assign(liveRepoConfiguration, loadedConfig)
     })
   }
@@ -369,10 +366,10 @@
     retrievingRecordStats = true
     const promises = []
     for (const identifier of identifiers) {
-      recordExists(appStateStore.state.openedRepoPath, identifier).then((recordExists) => {
+      recordExists(openedRepo.repo.local, identifier).then((recordExists) => {
         if (recordExists) {
           promises.push(
-            statRecord(appStateStore.state.openedRepoPath, identifier).then((recordDirStat) => {
+            statRecord(openedRepo.repo.local, identifier).then((recordDirStat) => {
               if (recordDirStat.lastModified == null) {
                 let liveRecordIndex = liveLRecordFlow.findIndex(
                   (value) => value.identifier == identifier
@@ -397,7 +394,7 @@
       })
     }
     promises.push(
-      statRepoConfig(appStateStore.state.openedRepoPath).then((stat) => {
+      statRepoConfig(openedRepo.repo.local).then((stat) => {
         liveRepoConfFileStats = stat
       })
     )
@@ -457,7 +454,7 @@
   }
 
   onMount(() => {
-    loadAppState().then(() => {
+    guaranteeConfiguration().then(() => {
       reloadRepoConfiguration()
       reloadAllRecords()
     })
@@ -486,8 +483,8 @@
   bind:open={editRepoConfigOpen}
   placement="right"
   onclose={() => {
-    setRepoConfig(appStateStore.state.openedRepoPath, $state.snapshot(liveRepoConfiguration))
-    attemptUnlockRepoConfig(appStateStore.state.openedRepoPath)
+    setRepoConfig(openedRepo.repo.local, $state.snapshot(liveRepoConfiguration))
+    attemptUnlockRepoConfig(openedRepo.repo.local)
   }}
 >
   <ConfigureRepository bind:repoConfig={liveRepoConfiguration} />
@@ -499,7 +496,7 @@
   onclose={() => {
     let recordId = liveLRecordFlow[editingLiveIndex].identifier
     if (!modifiedRecords.has(liveLRecordFlow[editingLiveIndex].identifier)) {
-      attemptUnlockRecord(appStateStore.state.openedRepoPath, recordId).then((success) => {
+      attemptUnlockRecord(openedRepo.repo.local, recordId).then((success) => {
         if (success) {
           liveRecordDirStats[recordId].lockStatus = null
         }
@@ -516,9 +513,9 @@
   />
 </Drawer>
 
-<div class="w-full h-full px-4 sm:px-1 pt-4">
+<div class="px-4 sm:px-1 pt-4">
   <div class="mb-2 mx-1 flex flex-wrap justify-between items-end">
-    <div class="w-fit h-fit mb-2 mx-2">
+    <div class="mb-2 mx-2">
       <Label>Filter Configuration</Label>
       <RecordFilterBuilder
         columns={liveColumns}
@@ -556,7 +553,7 @@
           id="repo-configure-button"
           disabled={liveRepoConfFileStats ? liveRepoConfFileStats.lockStatus != null : true}
           onclick={() => {
-            attemptLockRepoConfig(appStateStore.state.openedRepoPath).then((success) => {
+            attemptLockRepoConfig(openedRepo.repo.local).then((success) => {
               if (success) {
                 editRepoConfigOpen = true
               } else {
@@ -596,6 +593,7 @@
             <Tooltip>Everything looks good and is saved!</Tooltip>
           {/if}
         </TableHeadCell>
+        <TableHeadCell>Actions</TableHeadCell>
         <TableHeadCell>
           {@render columnHeaderDisplay('identifier', 'Identifier')}
         </TableHeadCell>
@@ -604,33 +602,82 @@
             {@render columnHeaderDisplay(key, key)}
           </TableHeadCell>
         {/each}
-        <TableHeadCell></TableHeadCell>
       </TableHead>
       <TableBody>
         {#each displayedRecords as { record: { identifier, metadata }, index: liveRecordIndex } (liveRecordIndex)}
           <TableBodyRow class="border-gray-200">
             <TableBodyCell>
-              {#if displayedRecordIssueCount[identifier]}
-                <ExclamationCircleOutline color="red" />
-                <Tooltip>
-                  {displayedRecordIssueCount[identifier]} issue(s) found with metadata associated with
-                  this record. Updates will not be saved until fixed.
-                </Tooltip>
-              {:else if modifiedRecords.has(identifier) && recordFlushTimers[identifier]}
-                <FloppyDiskOutline color="cyan" />
-                <Tooltip>
-                  Saving record in {(recordFlushTimers[identifier].delay / 1000).toFixed(0)} seconds...
-                </Tooltip>
-              {:else if recordLocks[identifier]}
-                <ChalkboardUserOutline color="purple" />
-                <Tooltip>
-                  The record cannot be modified at this time as {liveRecordDirStats[identifier]
-                    .lockStatus.currentUser} is editing this record.
-                </Tooltip>
-              {:else}
-                <CheckCircleOutline class="shrink-0" color="green" />
-                <Tooltip>No issues found and record is saved.</Tooltip>
-              {/if}
+              <div class="flex justify-start items-center space-x-2">
+                <span>
+                  {#if displayedRecordIssueCount[identifier]}
+                    <ExclamationCircleOutline color="red" />
+                    <Tooltip>
+                      {displayedRecordIssueCount[identifier]} issue(s) found with metadata associated
+                      with this record. Updates will not be saved until fixed.
+                    </Tooltip>
+                  {:else if modifiedRecords.has(identifier) && recordFlushTimers[identifier]}
+                    <FloppyDiskOutline color="cyan" />
+                    <Tooltip>
+                      Saving record in {(recordFlushTimers[identifier].delay / 1000).toFixed(0)} seconds...
+                    </Tooltip>
+                  {:else if recordLocks[identifier]}
+                    <ChalkboardUserOutline color="purple" />
+                    <Tooltip>
+                      The record cannot be modified at this time as {liveRecordDirStats[identifier]
+                        .lockStatus.currentUser} is editing this record.
+                    </Tooltip>
+                  {:else}
+                    <CheckCircleOutline class="shrink-0" color="green" />
+                    <Tooltip>No issues found and record is saved.</Tooltip>
+                  {/if}
+                </span>
+              </div>
+            </TableBodyCell>
+            <TableBodyCell>
+              <span>
+                <ButtonGroup>
+                  <Button
+                    onclick={() => editRecord(liveRecordIndex)}
+                    size="xs"
+                    class="p-2!"
+                    pill
+                    outline
+                    disabled={recordLocks[identifier] != null}><EditOutline size="xs" /></Button
+                  >
+                  <Button
+                    onclick={() => reloadRecord(identifier)}
+                    size="xs"
+                    pill
+                    outline
+                    class="p-2!"><RefreshOutline size="xs" /></Button
+                  >
+                  <Button
+                    onclick={() => openRepoRecordDirectory(openedRepo.repo.local, identifier)}
+                    size="xs"
+                    pill
+                    outline
+                    class="p-2!"
+                    disabled={recordLocks[identifier] != null}
+                  >
+                    <FolderArrowRightOutline size="xs" />
+                  </Button>
+                  <Button
+                    onclick={() => {
+                      removeRecord(liveRecordIndex)
+                    }}
+                    size="xs"
+                    pill
+                    outline
+                    color="red"
+                    disabled={recordLocks[identifier] != null}
+                    class="p-2!"><TrashBinOutline size="xs" /></Button
+                  >
+                </ButtonGroup>
+                <Tooltip>Edit Record Metadata</Tooltip>
+                <Tooltip>Reload from Disk</Tooltip>
+                <Tooltip>Open Record Directory</Tooltip>
+                <Tooltip>Delete Record</Tooltip>
+              </span>
             </TableBodyCell>
             <TableBodyCell>{identifier}</TableBodyCell>
             {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key }, colIndex (colIndex)}
@@ -650,55 +697,6 @@
                 </div>
               </TableBodyCell>
             {/each}
-            <TableBodyCell>
-              <Button outline size="sm" class="border-0 p-1!" color="dark">
-                <DotsVerticalOutline />
-              </Button>
-              <Popover trigger="click">
-                <Button
-                  onclick={() => editRecord(liveRecordIndex)}
-                  size="xs"
-                  class="p-2!"
-                  pill
-                  outline
-                  disabled={recordLocks[identifier] != null}
-                  color="primary"><EditOutline size="xs" /></Button
-                >
-                <Tooltip>Edit Record Metadata</Tooltip>
-                <Button
-                  onclick={() => reloadRecord(identifier)}
-                  size="xs"
-                  pill
-                  outline
-                  color="secondary"
-                  class="p-2!"><RefreshOutline size="xs" /></Button
-                >
-                <Tooltip>Reload from Disk</Tooltip>
-                <Button
-                  onclick={() =>
-                    openRepoRecordDirectory(appStateStore.state.openedRepoPath, identifier)}
-                  size="xs"
-                  pill
-                  outline
-                  color="secondary"
-                  class="p-2!"
-                  disabled={recordLocks[identifier] != null}
-                >
-                  <FolderArrowRightOutline size="xs" />
-                </Button>
-                <Tooltip>Open Record Directory</Tooltip>
-                <Button
-                  onclick={() => removeRecord(liveRecordIndex)}
-                  size="xs"
-                  pill
-                  outline
-                  color="red"
-                  disabled={recordLocks[identifier] != null}
-                  class="p-2!"><TrashBinOutline size="xs" /></Button
-                >
-                <Tooltip>Delete Record</Tooltip>
-              </Popover>
-            </TableBodyCell>
           </TableBodyRow>
         {/each}
       </TableBody>
@@ -741,7 +739,7 @@
         else if (liveSortingColumns[key] == false) delete liveSortingColumns[key]
       }}
       >{displayName}
-      <span class="pl-1 w-fit h-fit">
+      <span class="pl-1">
         {#if liveSortingColumns[key] != undefined}
           {#if liveSortingColumns[key]}
             <AngleUpOutline size="xs" />

@@ -1,10 +1,10 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerIPCHandleRetriever, registerIPCHandles } from './lib/IpcIndexer'
 import * as repo from './lib/repo'
-import * as state from './lib/state'
+import * as persistence from './lib/persistence'
 import * as dialog from './lib/dialog'
 import * as tabular from './lib/tabular'
 
@@ -61,7 +61,7 @@ app.whenReady().then(() => {
 
   // Register Entire Module IPCs
   registerIPCHandles(repo, 'repo')
-  registerIPCHandles(state, 'state')
+  registerIPCHandles(persistence, 'persistence')
   registerIPCHandles(dialog, 'dialog')
   registerIPCHandles(tabular, 'tabular')
   registerIPCHandleRetriever()

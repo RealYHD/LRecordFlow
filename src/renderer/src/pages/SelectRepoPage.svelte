@@ -11,7 +11,7 @@
     TableHeadCell,
     Tooltip
   } from 'flowbite-svelte'
-  import { appStateStore, loadAppState } from '../lib/state.svelte'
+  import { appConfig, guaranteeConfiguration, openedRepo } from '../lib/state.svelte'
   import {
     getAllRecordsForRepo,
     getRepoLastModified,
@@ -22,22 +22,23 @@
   import { navigate } from '../lib/router.svelte'
   import { FolderArrowRightOutline, TrashBinOutline } from 'flowbite-svelte-icons'
   import AddRepository from '../components/AddRepository.svelte'
-  let repos: Record<
-    string,
-    {
-      name: string | undefined
-      lastModified: string | undefined
-      recordCount: number | undefined
-    }
-  > = $state({})
+  import type { Repository } from '../../../common/types/models'
+
+  interface RepositoryInformation {
+    repository: Repository | undefined
+    lastModified: string | undefined
+    recordCount: number | undefined
+  }
+
+  let repos: Record<string, RepositoryInformation> = $state({})
 
   let addRepositoryModalOpen: boolean = $state(false)
 
   function loadRepos(): void {
     repos = {}
-    for (const repo of appStateStore.state.knownRepos) {
-      let repoInfo = {
-        name: repo.name,
+    for (const repo of appConfig.knownRepos) {
+      let repoInfo: RepositoryInformation = {
+        repository: repo,
         lastModified: undefined,
         recordCount: undefined
       }
@@ -78,7 +79,7 @@
     if (repoPath.length == 0) {
       issues.push('Repository path cannot be blank.')
     }
-    let sameNameRepo = appStateStore.state.knownRepos.find((repo) => repo.name == repoName)
+    let sameNameRepo = appConfig.knownRepos.find((repo) => repo.name == repoName)
     if (sameNameRepo != undefined) {
       issues.push(`"${repoName}" is already in use by repository at "${sameNameRepo.local}".`)
     }
@@ -86,7 +87,7 @@
   }
 
   onMount(() => {
-    loadAppState().then(() => {
+    guaranteeConfiguration().then(() => {
       loadRepos()
     })
   })
@@ -100,7 +101,7 @@
     <div>
       <AddRepository
         addRepositoryPath={(name, path) => {
-          appStateStore.state.knownRepos.push({
+          appConfig.knownRepos.push({
             name: name,
             local: path
           })
@@ -126,17 +127,17 @@
       <TableHeadCell>Record Count</TableHeadCell>
     </TableHead>
     <TableBody>
-      {#each Object.entries(repos).toSorted(([, repoA], [, repoB]) => Date.parse(repoA.lastModified) - Date.parse(repoB.lastModified)) as [localPath, repo], index (index)}
+      {#each Object.entries(repos).toSorted(([, repoA], [, repoB]) => Date.parse(repoA.lastModified) - Date.parse(repoB.lastModified)) as [localPath, repoInfo], index (index)}
         <TableBodyRow>
           <TableBodyCell>
             <ButtonGroup size="sm">
               <Button
                 onclick={() => {
-                  appStateStore.state.openedRepoPath = localPath
+                  openedRepo.repo = repoInfo.repository
                   navigate('/repository')
                 }}
               >
-                {#if appStateStore.state.openedRepoPath == localPath}
+                {#if openedRepo.repo && openedRepo.repo.local == localPath}
                   View
                 {:else}
                   Open
@@ -145,8 +146,8 @@
               <Button
                 id={`delete-${index}-dir-btn`}
                 onclick={() => {
-                  appStateStore.state.openedRepoPath = undefined
-                  appStateStore.state.knownRepos.splice(index, 1)
+                  openedRepo.repo = undefined
+                  appConfig.knownRepos.splice(index, 1)
                   loadRepos()
                 }}><TrashBinOutline /></Button
               >
@@ -160,19 +161,19 @@
             <Tooltip triggeredBy={`#open-${index}-dir-btn`}>Open Repository Directory</Tooltip>
           </TableBodyCell>
           <TableBodyCell>
-            {repo.name}
+            {repoInfo.repository.name}
           </TableBodyCell>
           <TableBodyCell>
-            {#if repo.lastModified != undefined}
-              {repo.lastModified}
+            {#if repoInfo.lastModified != undefined}
+              {repoInfo.lastModified}
             {:else}
               Loading...
             {/if}
           </TableBodyCell>
           <TableBodyCell>{localPath}</TableBodyCell>
           <TableBodyCell>
-            {#if repo.recordCount != undefined}
-              {repo.recordCount}
+            {#if repoInfo.recordCount != undefined}
+              {repoInfo.recordCount}
             {:else}
               Loading...
             {/if}

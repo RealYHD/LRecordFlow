@@ -10,19 +10,22 @@ export interface NotificationDescriptor {
   message: string
 }
 
-export interface AppState {
+export interface AppConfiguration {
   knownRepos: Repository[]
-  openedRepoPath: string | null
-  ongoingProcesses: Record<string, ProcessDescriptor>
+  watchedProcesses: Record<string, ProcessDescriptor>
+}
+
+export interface PromiseDescriptorMessage {
+  title: string
+  description: string
 }
 
 export interface PromiseDescriptor {
   id: string
-  title: string
   promise: Promise<any>
-  status: string
+  message: PromiseDescriptorMessage
   startTime: Date
-  endTime: Date | null
+  endTime: Date | undefined
 }
 
 export interface ProcessDescriptor {

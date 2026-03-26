@@ -1,54 +1,73 @@
 import { SvelteMap } from 'svelte/reactivity'
-import type { AppState, PromiseDescriptor } from '../../../common/types/models';
+import type {
+  AppConfiguration,
+  PromiseDescriptor,
+  PromiseDescriptorMessage,
+  Repository
+} from '../../../common/types/models'
 
 export const LoadStatePromiseId = 'Load State'
 
-export const appStateStore: { state: AppState; promises: SvelteMap<string, PromiseDescriptor> } =
-  $state({
-    state: {
-      knownRepos: [],
-      openedRepoPath: null,
-      ongoingProcesses: {}
-    },
-    promises: new SvelteMap()
-  })
+export const appConfig: AppConfiguration = $state({
+  knownRepos: [],
+  watchedProcesses: {}
+})
 
-export function trackPromise(promiseDescriptor: PromiseDescriptor): PromiseDescriptor {
-  if (appStateStore.promises.has(promiseDescriptor.id)) {
-    return appStateStore.promises.get(promiseDescriptor.id)
+export const openedRepo: { repo: Repository } = $state({ repo: undefined })
+const trackedPromises: SvelteMap<string, PromiseDescriptor> = new SvelteMap()
+
+export function trackPromise(
+  id: string,
+  generatePromise: (message: PromiseDescriptorMessage) => Promise<any>,
+  stopTrackingOnComplete: boolean = true
+): PromiseDescriptor {
+  if (trackedPromises.has(id)) return trackedPromises.get(id)
+  let message: PromiseDescriptorMessage = {
+    title: '',
+    description: ''
   }
-  promiseDescriptor.promise.then(() => {
-    getTrackedPromise(promiseDescriptor.id).endTime = new Date()
+  let generatedPromise = generatePromise(message)
+  trackedPromises.set(id, {
+    id: id,
+    promise: generatedPromise,
+    message: message,
+    startTime: new Date(),
+    endTime: undefined
   })
-  appStateStore.promises.set(promiseDescriptor.id, promiseDescriptor)
-  return appStateStore.promises.get(promiseDescriptor.id)
+  generatedPromise.then(() => {
+    getTrackedPromise(id).endTime = new Date()
+  })
+  if (stopTrackingOnComplete) {
+    generatedPromise.then(() => {
+      stopTrackingPromise(id)
+    })
+  }
+  return getTrackedPromise(id)
 }
 
 export function getTrackedPromise(id: string) {
-  return appStateStore.promises.get(id)
+  return trackedPromises.get(id)
 }
 
 export function stopTrackingPromise(id: string) {
-  return appStateStore.promises.delete(id)
+  return trackedPromises.delete(id)
 }
 
-export function flush() {
-  window['state'].flush('state', $state.snapshot(appStateStore).state)
+export function saveConfiguration() {
+  window['persistence'].flush('config', $state.snapshot(appConfig))
 }
 
-export function loadAppState() {
-  if (appStateStore.promises.has(LoadStatePromiseId)) {
-    return getTrackedPromise(LoadStatePromiseId).promise
-  } else {
-    return trackPromise({
-      id: LoadStatePromiseId,
-      promise: window['state'].load('state', $state.snapshot(appStateStore).state).then((value) => {
-        Object.assign(appStateStore.state, value)
-      }),
-      startTime: new Date(),
-      title: 'Load App State',
-      endTime: null,
-      status: 'Loading app state from drive.'
-    }).promise
-  }
+export function isTrackedPromiseDone(id: string): boolean {
+  return !trackedPromises.has(id) || trackedPromises.get(id).endTime != undefined
+}
+
+export function guaranteeConfiguration(): Promise<AppConfiguration> {
+  return trackPromise(LoadStatePromiseId, (message) => {
+    message.title = 'Loading Configuration'
+    message.description = 'Loading configuration'
+    return window['persistence'].load('config', $state.snapshot(appConfig)).then((value) => {
+      Object.assign(appConfig, value)
+      message.description = 'Completed loading configuration'
+    })
+  }).promise
 }
