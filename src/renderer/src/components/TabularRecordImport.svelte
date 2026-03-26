@@ -72,7 +72,7 @@
     // TODO show what records don't conform to current settings
     return {}
   })
-  let working: boolean = $derived(isTrackedPromiseDone(ImportPromiseDescId))
+  let working: boolean = $derived(!isTrackedPromiseDone(ImportPromiseDescId))
 
   function openTabular(path: string): void {
     if (!path.length) return
@@ -147,7 +147,7 @@
               message.title = 'Importing "${tabularPath}"'
               message.description = 'Importing tabular Dataset'
               return importLRecordFlowFromTabular(
-                openedRepo.local,
+                openedRepo.repo.local,
                 tabularPath,
                 identifierCol,
                 pathCols

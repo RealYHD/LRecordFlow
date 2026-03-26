@@ -73,7 +73,7 @@
     type RepositoryRecordFilter
   } from '../../../common/types/models'
   import RecordFilterBuilder from '../components/RecordFilterBuilder.svelte'
-  import AddRecord from '../components/AddRecord.svelte'
+  import AddRecord from '../components/CreateRecord.svelte'
 
   let liveRepoConfiguration: RepositoryConfiguration = $state({
     defined: [],
@@ -507,206 +507,206 @@
   />
 </Drawer>
 
-<div class="px-4 sm:px-1 pt-4">
-  <div class="mb-2 mx-1 flex flex-wrap justify-between items-end">
-    <div class="mb-2 mx-2">
-      <Label>Search/Filter</Label>
-      <RecordFilterBuilder
-        columns={liveColumns}
-        onFilterCreated={addFilterForMetadataKey}
-        bind:filter={demoFilter}
-      />
-      {#if demoFilter}
-        <Popover>
-          <Badge>{demoFilter.displayName}</Badge>
-        </Popover>
-      {/if}
-    </div>
-    <div class="flex flex-wrap items-end">
-      <div class="w-fit h-fit mb-2 mx-2">
-        <Button id="add-record-button">
-          <PlusOutline />
-        </Button>
-        <Button
-          id="import-button"
-          onclick={() => {
-            importTabularOpen = true
-          }}><FileImportOutline /></Button
-        >
-        <Button
-          id="repo-configure-button"
-          disabled={liveRepoConfFileStats ? liveRepoConfFileStats.lockStatus != null : true}
-          onclick={() => {
-            attemptLockRepoConfig(openedRepo.repo.local).then((success) => {
-              if (success) {
-                editRepoConfigOpen = true
-              } else {
-                // TODO display error about it being locked
-              }
-            })
-          }}
-        >
-          <AdjustmentsVerticalOutline />
-        </Button>
-        <Popover trigger="hover" triggeredBy="#add-record-button" title="Create Record">
-          <AddRecord
-            {addRecord}
-            validateIdentifier={(identifier) =>
-              validateCreatedRecordIdentifier(identifier, Object.keys(liveRecordsByIds))}
-          />
-        </Popover>
-        <Tooltip triggeredBy="#import-button">Import data from Tabular</Tooltip>
-        <Tooltip triggeredBy="#repo-configure-button">
-          {#if liveRepoConfFileStats ? liveRepoConfFileStats.lockStatus != null : true}
-            Waiting for {liveRepoConfFileStats.lockStatus.currentUser} to Finish Editing...
-          {:else}
-            Configure Repository
-          {/if}
-        </Tooltip>
+<div class="flex-1 flex shrink flex-col overflow-y-auto">
+  <div class="max-h-full">
+    <div class="mb-2 mx-1 flex flex-wrap justify-between items-end">
+      <div class="mb-2 mx-2">
+        <Label>Search/Filter</Label>
+        <RecordFilterBuilder
+          columns={liveColumns}
+          onFilterCreated={addFilterForMetadataKey}
+          bind:filter={demoFilter}
+        />
+        {#if demoFilter}
+          <Popover>
+            <Badge>{demoFilter.displayName}</Badge>
+          </Popover>
+        {/if}
+      </div>
+      <div class="flex flex-wrap items-end">
+        <div class="w-fit h-fit mb-2 mx-2">
+          <Button id="add-record-button">
+            <PlusOutline />
+          </Button>
+          <Button
+            id="import-button"
+            onclick={() => {
+              importTabularOpen = true
+            }}><FileImportOutline /></Button
+          >
+          <Button
+            id="repo-configure-button"
+            disabled={liveRepoConfFileStats ? liveRepoConfFileStats.lockStatus != null : true}
+            onclick={() => {
+              attemptLockRepoConfig(openedRepo.repo.local).then((success) => {
+                if (success) {
+                  editRepoConfigOpen = true
+                } else {
+                  // TODO display error about it being locked
+                }
+              })
+            }}
+          >
+            <AdjustmentsVerticalOutline />
+          </Button>
+          <Popover trigger="hover" triggeredBy="#add-record-button" title="Create Record">
+            <AddRecord
+              {addRecord}
+              validateIdentifier={(identifier) =>
+                validateCreatedRecordIdentifier(identifier, Object.keys(liveRecordsByIds))}
+            />
+          </Popover>
+          <Tooltip triggeredBy="#import-button">Import data from Tabular</Tooltip>
+          <Tooltip triggeredBy="#repo-configure-button">
+            {#if liveRepoConfFileStats && liveRepoConfFileStats.lockStatus}
+              Waiting for {liveRepoConfFileStats.lockStatus.currentUser} to Finish Editing...
+            {:else}
+              Configure Repository
+            {/if}
+          </Tooltip>
+        </div>
       </div>
     </div>
-  </div>
-  <div>
-    {#if displayedRecords.length > 5}
-      {@render tableNavigation()}
-    {/if}
-    <Table hoverable={true} border={true} class="table-auto">
-      <TableHead class="normal-case">
-        <TableHeadCell class="w-fit">
-          {#if totalDisplayedIssueCount}
-            <ExclamationCircleOutline color="red" />
-            <Tooltip
-              >Validation failed for {Object.keys(displayedRecordIssueCount).length} (unsaved) records</Tooltip
-            >
-          {:else if modifiedRecords.size && Object.keys(recordFlushTimers).length}
-            <FloppyDiskOutline color="yellow" />
-            <Tooltip>{modifiedRecords.size} records still pending saving...</Tooltip>
-          {:else}
-            <ClipboardCheckOutline color="green" />
-            <Tooltip>Everything looks good and is saved!</Tooltip>
-          {/if}
-        </TableHeadCell>
-        <TableHeadCell>Actions</TableHeadCell>
-        <TableHeadCell>
-          {@render columnHeaderDisplay('identifier', 'Identifier')}
-        </TableHeadCell>
-        {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key } (key)}
-          <TableHeadCell>
-            {@render columnHeaderDisplay(key, key)}
+    <div>
+      <Table hoverable={true} border={true}>
+        <TableHead class="normal-case">
+          <TableHeadCell class="w-fit">
+            {#if totalDisplayedIssueCount}
+              <ExclamationCircleOutline color="red" />
+              <Tooltip
+                >Validation failed for {Object.keys(displayedRecordIssueCount).length} (unsaved) records</Tooltip
+              >
+            {:else if modifiedRecords.size && Object.keys(recordFlushTimers).length}
+              <FloppyDiskOutline color="yellow" />
+              <Tooltip>{modifiedRecords.size} records still pending saving...</Tooltip>
+            {:else}
+              <ClipboardCheckOutline color="green" />
+              <Tooltip>Everything looks good and is saved!</Tooltip>
+            {/if}
           </TableHeadCell>
-        {/each}
-      </TableHead>
-      <TableBody>
-        {#each displayedRecords as { record: { identifier, metadata }, liveRecordIndex }, index (index)}
-          <TableBodyRow class="border-gray-200">
-            <TableBodyCell>
-              <div class="flex justify-start items-center space-x-2">
-                <span>
-                  {#if displayedRecordIssueCount[identifier]}
-                    <ExclamationCircleOutline color="red" />
-                    <Tooltip>
-                      {displayedRecordIssueCount[identifier]} issue(s) found with metadata associated
-                      with this record. Updates will not be saved until fixed.
-                    </Tooltip>
-                  {:else if modifiedRecords.has(identifier) && recordFlushTimers[identifier]}
-                    <FloppyDiskOutline color="cyan" />
-                    <Tooltip>
-                      Saving record in {(recordFlushTimers[identifier].delay / 1000).toFixed(0)} seconds...
-                    </Tooltip>
-                  {:else if recordLocks[identifier]}
-                    <ChalkboardUserOutline color="purple" />
-                    <Tooltip>
-                      The record cannot be modified at this time as {liveRecordDirStats[identifier]
-                        .lockStatus.currentUser} is editing this record.
-                    </Tooltip>
-                  {:else}
-                    <CheckCircleOutline class="shrink-0" color="green" />
-                    <Tooltip>No issues found and record is saved.</Tooltip>
-                  {/if}
-                </span>
-              </div>
-            </TableBodyCell>
-            <TableBodyCell>
-              <span>
-                <ButtonGroup>
-                  <Button
-                    id={`edit-record-${liveRecordIndex}-btn`}
-                    onclick={() => editRecord(liveRecordIndex)}
-                    size="xs"
-                    class="p-2!"
-                    pill
-                    outline
-                    disabled={recordLocks[identifier] != null}><EditOutline size="xs" /></Button
-                  >
-                  <Button
-                    id={`reload-record-${liveRecordIndex}-btn`}
-                    onclick={() => reloadRecord(identifier)}
-                    size="xs"
-                    pill
-                    outline
-                    class="p-2!"><RefreshOutline size="xs" /></Button
-                  >
-                  <Button
-                    id={`open-dir-record-${liveRecordIndex}-btn`}
-                    onclick={() => openRepoRecordDirectory(openedRepo.repo.local, identifier)}
-                    size="xs"
-                    pill
-                    outline
-                    class="p-2!"
-                    disabled={recordLocks[identifier] != null}
-                  >
-                    <FolderArrowRightOutline size="xs" />
-                  </Button>
-                  <Button
-                    id={`delete-record-${liveRecordIndex}-btn`}
-                    onclick={() => {
-                      removeRecord(liveRecordIndex)
-                    }}
-                    size="xs"
-                    pill
-                    outline
-                    color="red"
-                    disabled={recordLocks[identifier] != null}
-                    class="p-2!"><TrashBinOutline size="xs" /></Button
-                  >
-                </ButtonGroup>
-                <Tooltip triggeredBy={`#edit-record-${liveRecordIndex}-btn`}
-                  >Edit Record Metadata</Tooltip
-                >
-                <Tooltip triggeredBy={`#reload-record-${liveRecordIndex}-btn`}
-                  >Reload from Disk</Tooltip
-                >
-                <Tooltip triggeredBy={`#open-dir-record-${liveRecordIndex}-btn`}
-                  >Open Record Directory</Tooltip
-                >
-                <Tooltip triggeredBy={`#delete-record-${liveRecordIndex}-btn`}
-                  >Delete Record</Tooltip
-                >
-              </span>
-            </TableBodyCell>
-            <TableBodyCell>{identifier}</TableBodyCell>
-            {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key }, colIndex (colIndex)}
+          <TableHeadCell>Actions</TableHeadCell>
+          <TableHeadCell>
+            {@render columnHeaderDisplay('identifier', 'Identifier')}
+          </TableHeadCell>
+          {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key } (key)}
+            <TableHeadCell>
+              {@render columnHeaderDisplay(key, key)}
+            </TableHeadCell>
+          {/each}
+        </TableHead>
+        <TableBody>
+          {#each displayedRecords as { record: { identifier, metadata }, liveRecordIndex }, index (index)}
+            <TableBodyRow class="border-gray-200">
               <TableBodyCell>
-                <div class="flex items-center">
-                  {#if displayedRecordIssues[identifier][key] && displayedRecordIssues[identifier][key].length}
-                    <ExclamationCircleOutline color="red" class="shrink-0" />
-                    <Popover>
-                      <ul>
-                        {#each displayedRecordIssues[identifier][key] as issue (issue)}
-                          <li>{issue}</li>
-                        {/each}
-                      </ul>
-                    </Popover>
-                  {/if}
-                  {metadata[key]}
+                <div class="flex justify-start items-center space-x-2">
+                  <span>
+                    {#if displayedRecordIssueCount[identifier]}
+                      <ExclamationCircleOutline color="red" />
+                      <Tooltip>
+                        {displayedRecordIssueCount[identifier]} issue(s) found with metadata associated
+                        with this record. Updates will not be saved until fixed.
+                      </Tooltip>
+                    {:else if modifiedRecords.has(identifier) && recordFlushTimers[identifier]}
+                      <FloppyDiskOutline color="cyan" />
+                      <Tooltip>
+                        Saving record in {(recordFlushTimers[identifier].delay / 1000).toFixed(0)} seconds...
+                      </Tooltip>
+                    {:else if recordLocks[identifier]}
+                      <ChalkboardUserOutline color="purple" />
+                      <Tooltip>
+                        The record cannot be modified at this time as {liveRecordDirStats[
+                          identifier
+                        ].lockStatus.currentUser} is editing this record.
+                      </Tooltip>
+                    {:else}
+                      <CheckCircleOutline class="shrink-0" color="green" />
+                      <Tooltip>No issues found and record is saved.</Tooltip>
+                    {/if}
+                  </span>
                 </div>
               </TableBodyCell>
-            {/each}
-          </TableBodyRow>
-        {/each}
-      </TableBody>
-    </Table>
-    {@render tableNavigation()}
+              <TableBodyCell>
+                <span>
+                  <ButtonGroup>
+                    <Button
+                      id={`edit-record-${liveRecordIndex}-btn`}
+                      onclick={() => editRecord(liveRecordIndex)}
+                      size="xs"
+                      class="p-2!"
+                      pill
+                      outline
+                      disabled={recordLocks[identifier] != null}><EditOutline size="xs" /></Button
+                    >
+                    <Button
+                      id={`reload-record-${liveRecordIndex}-btn`}
+                      onclick={() => reloadRecord(identifier)}
+                      size="xs"
+                      pill
+                      outline
+                      class="p-2!"><RefreshOutline size="xs" /></Button
+                    >
+                    <Button
+                      id={`open-dir-record-${liveRecordIndex}-btn`}
+                      onclick={() => openRepoRecordDirectory(openedRepo.repo.local, identifier)}
+                      size="xs"
+                      pill
+                      outline
+                      class="p-2!"
+                      disabled={recordLocks[identifier] != null}
+                    >
+                      <FolderArrowRightOutline size="xs" />
+                    </Button>
+                    <Button
+                      id={`delete-record-${liveRecordIndex}-btn`}
+                      onclick={() => {
+                        removeRecord(liveRecordIndex)
+                      }}
+                      size="xs"
+                      pill
+                      outline
+                      color="red"
+                      disabled={recordLocks[identifier] != null}
+                      class="p-2!"><TrashBinOutline size="xs" /></Button
+                    >
+                  </ButtonGroup>
+                  <Tooltip triggeredBy={`#edit-record-${liveRecordIndex}-btn`}
+                    >Edit Record Metadata</Tooltip
+                  >
+                  <Tooltip triggeredBy={`#reload-record-${liveRecordIndex}-btn`}
+                    >Reload from Disk</Tooltip
+                  >
+                  <Tooltip triggeredBy={`#open-dir-record-${liveRecordIndex}-btn`}
+                    >Open Record Directory</Tooltip
+                  >
+                  <Tooltip triggeredBy={`#delete-record-${liveRecordIndex}-btn`}
+                    >Delete Record</Tooltip
+                  >
+                </span>
+              </TableBodyCell>
+              <TableBodyCell>{identifier}</TableBodyCell>
+              {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key }, colIndex (colIndex)}
+                <TableBodyCell>
+                  <div class="flex items-center">
+                    {#if displayedRecordIssues[identifier][key] && displayedRecordIssues[identifier][key].length}
+                      <ExclamationCircleOutline color="red" class="shrink-0" />
+                      <Popover>
+                        <ul>
+                          {#each displayedRecordIssues[identifier][key] as issue (issue)}
+                            <li>{issue}</li>
+                          {/each}
+                        </ul>
+                      </Popover>
+                    {/if}
+                    {metadata[key]}
+                  </div>
+                </TableBodyCell>
+              {/each}
+            </TableBodyRow>
+          {/each}
+        </TableBody>
+      </Table>
+      {@render tableNavigation()}
+    </div>
   </div>
 </div>
 

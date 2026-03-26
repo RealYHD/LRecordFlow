@@ -35,6 +35,6 @@
   </NavUl>
 </Navbar>
 
-<div class="flex-1">
+<div class="flex-1 flex flex-col">
   <Router />
 </div>
