@@ -23,7 +23,7 @@ export function recordDataIsEqual(record1: RecordMetadata, record2: RecordMetada
 }
 
 export async function getAllRecordsForRepo(localRepoPath: string): Promise<string[]> {
-  return await window['repo'].getAllLRecordFlow(localRepoPath)
+  return await window['repo'].getAllRecordsForRepo(localRepoPath)
 }
 
 export async function loadRecordFromRepo(
@@ -229,13 +229,13 @@ export async function openRepoDirectory(localRepoPath: string) {
   return await window['repo'].openRepoDirectory(localRepoPath)
 }
 
-export async function importLRecordFlowFromTabular(
+export async function importRecordsFromTabular(
   localRepoPath: string,
   tabularPath: string,
   identifierCol: string,
   pathColumns: string[]
 ): Promise<string[]> {
-  return await window['repo'].importLRecordFlowFromTabular(
+  return await window['repo'].importRecordsFromTabular(
     localRepoPath,
     tabularPath,
     identifierCol,

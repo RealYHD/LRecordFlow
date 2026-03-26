@@ -192,7 +192,7 @@ export async function getPathStats(pathToStat: string): Promise<PathStatus> {
 }
 
 export async function getRepoLastModified(localRepoPath: string): Promise<Date | null> {
-  let recordIdentifiers: string[] = await getAllLRecordFlow(localRepoPath)
+  let recordIdentifiers: string[] = await getAllRecordsForRepo(localRepoPath)
   let lastModified: Date | null = null
   for (const recordIdentifier of recordIdentifiers) {
     let recordStats: PathStatus = await statRecord(localRepoPath, recordIdentifier)
@@ -274,7 +274,7 @@ export async function repoExists(localRepoPath: string) {
   return (await stat(localRepoPath)).isDirectory()
 }
 
-export async function getAllLRecordFlow(localRepoPath: string): Promise<string[]> {
+export async function getAllRecordsForRepo(localRepoPath: string): Promise<string[]> {
   // TODO Perhaps in the future make this recursive for "nested records"?
   if (!(await repoExists(localRepoPath))) return []
   return (await readdir(localRepoPath, { withFileTypes: true }))
@@ -364,7 +364,7 @@ export async function openFileInRecord(
   return await shell.openPath(path.join(localRepoPath, recordIdentifier, filepath))
 }
 
-export async function importLRecordFlowFromTabular(
+export async function importRecordsFromTabular(
   localRepoPath: string,
   tabularPath: string,
   identifierCol: string,

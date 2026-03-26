@@ -1,4 +1,4 @@
-# LRecordFlow
+# LRepoFlow
 
 A git based approach to relational record keeping with a directory store per record. An Electron application with Svelte and TypeScript
 

@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: lrecordflow
+appId: me.realyhd.lrepoflow
+productName: lrepoflow
 directories:
   buildResources: build
 files:
@@ -13,7 +13,7 @@ files:
 asarUnpack:
   - resources/**
 win:
-  executableName: lrecordflow
+  executableName: lrepoflow
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
