@@ -1,14 +1,16 @@
 import { dialog, FileFilter } from 'electron'
 
-export async function selectSingleDirectory() {
+export async function selectSingleDirectory(): Promise<string | undefined> {
   const { canceled, filePaths } = await dialog.showOpenDialog({ properties: ['openDirectory'] })
   if (!canceled) {
     return filePaths[0]
   }
-  return null
+  return undefined
 }
 
-export async function selectSingleFileOfType(fileFilters: FileFilter[]) {
+export async function selectSingleFileOfType(
+  fileFilters: FileFilter[]
+): Promise<string | undefined> {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     properties: ['openFile'],
     filters: fileFilters
@@ -16,5 +18,5 @@ export async function selectSingleFileOfType(fileFilters: FileFilter[]) {
   if (!canceled) {
     return filePaths[0]
   }
-  return null
+  return undefined
 }

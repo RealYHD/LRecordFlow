@@ -18,7 +18,7 @@ const trackedPromises: SvelteMap<string, PromiseDescriptor> = new SvelteMap()
 
 export function trackPromise(
   id: string,
-  generatePromise: (status: PromiseDescriptorStatus) => Promise<any>,
+  generatePromise: (status: PromiseDescriptorStatus) => Promise<unknown>,
   stopTrackingOnComplete: boolean = true
 ): PromiseDescriptor {
   if (trackedPromises.has(id)) return trackedPromises.get(id)
@@ -32,11 +32,11 @@ export function trackPromise(
     id: id,
     promise: generatedPromise,
     status: status,
-    startTime: new Date(),
+    startTime: Date.now(),
     endTime: undefined
   })
   generatedPromise.then(() => {
-    getTrackedPromise(id).endTime = new Date()
+    getTrackedPromise(id).endTime = Date.now()
     getTrackedPromise(id).status.progress = 1
   })
   if (stopTrackingOnComplete) {
@@ -47,15 +47,15 @@ export function trackPromise(
   return getTrackedPromise(id)
 }
 
-export function getTrackedPromise(id: string) {
+export function getTrackedPromise(id: string): PromiseDescriptor {
   return trackedPromises.get(id)
 }
 
-export function stopTrackingPromise(id: string) {
+export function stopTrackingPromise(id: string): boolean {
   return trackedPromises.delete(id)
 }
 
-export function saveConfiguration() {
+export function saveConfiguration(): void {
   window['persistence'].flush('config', $state.snapshot(appConfig))
 }
 
@@ -71,5 +71,5 @@ export function guaranteeConfiguration(): Promise<AppConfiguration> {
       Object.assign(appConfig, value)
       message.description = 'Completed loading configuration'
     })
-  }).promise
+  }).promise as Promise<AppConfiguration>
 }

@@ -1,3 +1,4 @@
+import { SvelteSet } from 'svelte/reactivity'
 import {
   MetadataValueType,
   type MetadataDescriptor,
@@ -13,7 +14,7 @@ export async function repoExists(localRepoPath: string): Promise<boolean> {
   return await window['repo'].repoExists(localRepoPath)
 }
 
-export function recordDataIsEqual(record1: RecordMetadata, record2: RecordMetadata) {
+export function recordDataIsEqual(record1: RecordMetadata, record2: RecordMetadata): boolean {
   if (record1 == record2) return true
   if (!record1) return false
   if (!record2) return false
@@ -30,13 +31,13 @@ export async function loadRecordFromRepo(
   localRepoPath: string,
   identifier: string
 ): Promise<RepositoryRecord> {
-  return trackPromise(`load record ${localRepoPath} from ${identifier}`, async (status) => {
+  return trackPromise(`load record ${localRepoPath} from ${identifier}`, async () => {
     return {
       identifier: identifier,
       metadata: await window['repo'].getRecordMetadata(localRepoPath, identifier),
       files: await window['repo'].getFilesAssociatedWithRecord(localRepoPath, identifier)
     }
-  }).promise
+  }).promise as Promise<RepositoryRecord>
 }
 
 export function aggregateMetadataDescriptors(
@@ -44,7 +45,7 @@ export function aggregateMetadataDescriptors(
   repoConfig: RepositoryConfiguration
 ): MetadataDescriptor[] {
   const descriptors: MetadataDescriptor[] = $state([])
-  const included: Set<string> = new Set()
+  const included: Set<string> = new SvelteSet()
   for (const definedDescriptor of repoConfig.defined) {
     if (definedDescriptor.key == 'Identifier') continue
     included.add(definedDescriptor.key)
@@ -68,7 +69,7 @@ export function aggregateMetadataDescriptors(
   return descriptors
 }
 
-export async function deleteRecord(localRepoPath: string, recordIdentifier: string) {
+export async function deleteRecord(localRepoPath: string, recordIdentifier: string): Promise<void> {
   return await window['repo'].deleteRecord(localRepoPath, recordIdentifier)
 }
 
@@ -76,18 +77,20 @@ export async function saveRecord(
   localRepoPath: string,
   recordIdentifier: string,
   recordData: RecordMetadata
-) {
+): Promise<void> {
   window['repo'].setRecord(localRepoPath, recordIdentifier, recordData)
 }
 
-export async function getRepoConfig(localRepoPath: string) {
-  return window['repo'].getRepoConfiguration(localRepoPath)
+export async function getRepoConfig(
+  localRepoPath: string
+): Promise<RepositoryConfiguration | undefined> {
+  return (await window['repo'].getRepoConfiguration(localRepoPath)) || {}
 }
 
 export async function setRepoConfig(
   localRepoPath: string,
   repoConfiguration: RepositoryConfiguration
-) {
+): Promise<void> {
   return window['repo'].setRepoConfiguration(localRepoPath, repoConfiguration)
 }
 
@@ -133,7 +136,9 @@ export function validateRecords(
   return issues
 }
 
-export function countIssues(recordIssues: Record<string, Record<string, string[]>>) {
+export function countIssues(
+  recordIssues: Record<string, Record<string, string[]>>
+): Record<string, number> {
   const issueCount: Record<string, number> = $state({})
   for (const recordIdentifier in recordIssues) {
     let total = 0
@@ -221,11 +226,14 @@ export async function recordExists(
   return await window['repo'].recordExists(localRepoPath, recordIdentifier)
 }
 
-export async function openRepoRecordDirectory(localRepoPath: string, recordIdentifier: string) {
+export async function openRepoRecordDirectory(
+  localRepoPath: string,
+  recordIdentifier: string
+): Promise<string> {
   return await window['repo'].openRepoRecordDirectory(localRepoPath, recordIdentifier)
 }
 
-export async function openRepoDirectory(localRepoPath: string) {
+export async function openRepoDirectory(localRepoPath: string): Promise<string> {
   return await window['repo'].openRepoDirectory(localRepoPath)
 }
 
@@ -246,7 +254,7 @@ export async function importRecordsFromTabular(
 export function recordFiltersEqual(
   filter1: RepositoryRecordFilter,
   filter2: RepositoryRecordFilter
-) {
+): boolean {
   if (!filter1 && filter2) return false
   if (!filter2 && filter1) return false
   if (!filter2 && !filter1) return true

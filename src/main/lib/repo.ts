@@ -1,4 +1,3 @@
-import simpleGit, { GitResponseError, MergeResult, TaskOptions } from 'simple-git'
 import { access, copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'fs/promises'
 import path from 'path'
 import { shell } from 'electron'
@@ -6,7 +5,7 @@ import Papa from 'papaparse'
 import { createReadStream } from 'fs'
 import { check, lock, unlock } from 'proper-lockfile'
 import { userInfo } from 'os'
-import { PathStatus, lockStatus } from '../../common/types/models'
+import { PathStatus, RepositoryConfiguration, lockStatus } from '../../common/types/models'
 
 const recordMetadataFilename = '.lrf.record.json'
 const repoConfigurationFilename = '.lrf.config.json'
@@ -21,58 +20,6 @@ function getRecordMetadataPath(localRepoPath: string, recordIdentifier: string):
   return path.join(getRecordPath(localRepoPath, recordIdentifier), recordMetadataFilename)
 }
 
-export async function cloneGitRepository(
-  remoteRepoPath: string,
-  localRepoPath: string,
-  localRepoName: string
-) {
-  await simpleGit({ baseDir: localRepoPath }).clone(
-    remoteRepoPath,
-    path.join(localRepoPath, localRepoName)
-  )
-  return path.join(localRepoPath, localRepoName)
-}
-
-export async function repoHasPendingChanges(localRepoPath: string) {
-  return (await simpleGit({ baseDir: localRepoPath }).status()).modified
-}
-
-export async function repoIsSynced(localRepoPath: string) {
-  const gitStatus = await simpleGit({ baseDir: localRepoPath }).fetch().status()
-  return gitStatus.ahead == 0 && gitStatus.behind == 0
-}
-
-async function merge(localRepoPath: string, options: TaskOptions) {
-  try {
-    const mergeSummary = await simpleGit({ baseDir: localRepoPath }).merge(options)
-    return mergeSummary.conflicts
-  } catch (err) {
-    const mergeSummary: MergeResult = (err as GitResponseError<MergeResult>).git
-    const conflicts = mergeSummary?.conflicts || []
-    return conflicts
-  }
-}
-
-export async function syncLocalRepoWithRemote(localRepoPath: string) {
-  return merge(localRepoPath, [])
-}
-
-export async function continueSyncLocalRepoWithRemote(localRepoPath: string) {
-  return merge(localRepoPath, ['--continue'])
-}
-
-export async function abortSyncLocalRepoWithRemote(localRepoPath: string) {
-  return merge(localRepoPath, ['--abort'])
-}
-
-export async function syncRemoteRepoWithLocal(localRepoPath: string) {
-  return (await simpleGit({ baseDir: localRepoPath }).push()).remoteMessages
-}
-
-export async function save(localRepoPath: string, modificationNotes: string) {
-  return (await simpleGit({ baseDir: localRepoPath }).add('.').commit(modificationNotes)).summary
-}
-
 export async function recordExists(
   localRepoPath: string,
   recordIdentifier: string
@@ -80,33 +27,42 @@ export async function recordExists(
   const recordDirectory = getRecordPath(localRepoPath, recordIdentifier)
   try {
     await access(recordDirectory)
-  } catch (error) {
+  } catch {
     return false
   }
   return (await stat(recordDirectory)).isDirectory()
 }
 
-export async function attemptLockRecord(localRepoPath: string, recordIdentifier: string) {
+export async function attemptLockRecord(
+  localRepoPath: string,
+  recordIdentifier: string
+): Promise<boolean> {
   return await attemptLockPath(path.join(localRepoPath, recordIdentifier))
 }
 
-export async function attemptUnlockRecord(localRepoPath: string, recordIdentifier: string) {
+export async function attemptUnlockRecord(
+  localRepoPath: string,
+  recordIdentifier: string
+): Promise<boolean> {
   return await attemptUnlockPath(path.join(localRepoPath, recordIdentifier))
 }
 
-export async function statRecord(localRepoPath: string, recordIdentifier: string) {
+export async function statRecord(
+  localRepoPath: string,
+  recordIdentifier: string
+): Promise<PathStatus> {
   return await getPathStats(path.join(localRepoPath, recordIdentifier))
 }
 
-export async function attemptLockRepoConfig(localRepoPath) {
+export async function attemptLockRepoConfig(localRepoPath): Promise<boolean> {
   return await attemptLockPath(path.join(localRepoPath, repoConfigurationFilename))
 }
 
-export async function attemptUnlockRepoConfig(localRepoPath) {
+export async function attemptUnlockRepoConfig(localRepoPath): Promise<boolean> {
   return await attemptUnlockPath(path.join(localRepoPath, repoConfigurationFilename))
 }
 
-export async function statRepoConfig(localRepoPath) {
+export async function statRepoConfig(localRepoPath): Promise<PathStatus> {
   return await getPathStats(path.join(localRepoPath, repoConfigurationFilename))
 }
 
@@ -128,14 +84,14 @@ export async function attemptLockPath(pathToLock: string): Promise<boolean> {
     await lock(pathToLock)
     await writeFile(lockInfoPath, JSON.stringify(lockInfo))
     return true
-  } catch (error) {
+  } catch {
     // TODO check if it exists, if not, return generic message
     // TODO check if it's the same user as the one currently trying to edit (indicates multiple instances of the software is open)
     return false
   }
 }
 
-export async function attemptUnlockPath(pathToUnlock: string) {
+export async function attemptUnlockPath(pathToUnlock: string): Promise<boolean> {
   const pathStat = await stat(pathToUnlock)
   const pathIsDir = pathStat.isDirectory()
   const basename = path.basename(pathToUnlock)
@@ -174,7 +130,7 @@ export async function getPathStats(pathToStat: string): Promise<PathStatus> {
   let lastModifiedTime: Date | undefined = undefined
   try {
     lastModifiedTime = (await stat(pathToStat)).mtime
-  } catch (error) {
+  } catch {
     return { lastModified: null, lockStatus: null }
   }
   if (await check(pathToStat)) {
@@ -182,7 +138,7 @@ export async function getPathStats(pathToStat: string): Promise<PathStatus> {
     try {
       await access(lockInfoPath)
       lockStatus = JSON.parse(await readFile(lockInfoPath, 'utf-8'))
-    } catch (error) {
+    } catch {
       await writeFile(lockInfoPath, JSON.stringify(lockStatus))
     }
     return { lastModified: lastModifiedTime, lockStatus: lockStatus }
@@ -218,18 +174,18 @@ export async function recordHasMetadata(
   const metadataPath = getRecordMetadataPath(localRepoPath, recordIdentifier)
   try {
     await access(metadataPath)
-  } catch (error) {
+  } catch {
     return false
   }
   return (await stat(metadataPath)).isFile()
 }
 
-export async function createRecord(localRepoPath: string, recordIdentifier: string) {
+export async function createRecord(localRepoPath: string, recordIdentifier: string): Promise<void> {
   if (await recordExists(localRepoPath, recordIdentifier)) return
   return await mkdir(getRecordPath(localRepoPath, recordIdentifier))
 }
 
-export async function deleteRecord(localRepoPath: string, recordIdentifier: string) {
+export async function deleteRecord(localRepoPath: string, recordIdentifier: string): Promise<void> {
   if (!(await recordExists(localRepoPath, recordIdentifier))) return
   return await rm(getRecordPath(localRepoPath, recordIdentifier), { recursive: true, force: true })
 }
@@ -255,7 +211,7 @@ export async function setRecord(
   localRepoPath: string,
   recordIdentifier: string,
   recordData: object
-) {
+): Promise<void> {
   if (!localRepoPath.trim().length) return
   if (!recordIdentifier.trim().length) return
   await mkdir(path.join(localRepoPath, recordIdentifier), { recursive: true })
@@ -265,10 +221,10 @@ export async function setRecord(
   )
 }
 
-export async function repoExists(localRepoPath: string) {
+export async function repoExists(localRepoPath: string): Promise<boolean> {
   try {
     await access(localRepoPath)
-  } catch (error) {
+  } catch {
     return false
   }
   return (await stat(localRepoPath)).isDirectory()
@@ -288,23 +244,30 @@ export async function getAllRecordsForRepo(localRepoPath: string): Promise<strin
     .map((dir) => dir.name)
 }
 
-export async function repoConfigurationExists(localRepoPath: string) {
-  if (!(await repoExists(localRepoPath))) return []
+export async function repoConfigurationExists(localRepoPath: string): Promise<boolean> {
+  if (!(await repoExists(localRepoPath))) return false
   try {
     await access(path.join(localRepoPath, repoConfigurationFilename))
-  } catch (error) {
+  } catch {
     return false
   }
   return true
 }
 
-export async function getRepoConfiguration(localRepoPath: string) {
+export async function getRepoConfiguration(
+  localRepoPath: string
+): Promise<RepositoryConfiguration | undefined> {
   if (!(await repoExists(localRepoPath)) || !(await repoConfigurationExists(localRepoPath)))
-    return {}
-  return JSON.parse(await readFile(path.join(localRepoPath, repoConfigurationFilename), 'utf-8'))
+    return undefined
+  return JSON.parse(
+    await readFile(path.join(localRepoPath, repoConfigurationFilename), 'utf-8')
+  ) as RepositoryConfiguration
 }
 
-export async function setRepoConfiguration(localRepoPath: string, repoConfiguration: object) {
+export async function setRepoConfiguration(
+  localRepoPath: string,
+  repoConfiguration: object
+): Promise<void> {
   if (!(await repoExists(localRepoPath))) return
   return await writeFile(
     path.join(localRepoPath, repoConfigurationFilename),
@@ -312,18 +275,21 @@ export async function setRepoConfiguration(localRepoPath: string, repoConfigurat
   )
 }
 
-export async function openRepoDirectory(localRepoPath: string) {
+export async function openRepoDirectory(localRepoPath: string): Promise<string> {
   return await shell.openPath(localRepoPath)
 }
 
-export async function openRepoRecordDirectory(localRepoPath: string, recordIdentifier: string) {
+export async function openRepoRecordDirectory(
+  localRepoPath: string,
+  recordIdentifier: string
+): Promise<string> {
   return await shell.openPath(path.join(localRepoPath, recordIdentifier))
 }
 
 export async function getFilesAssociatedWithRecord(
   localRepoPath: string,
   recordIdentifier: string
-) {
+): Promise<string[]> {
   return (
     await readdir(path.join(localRepoPath, recordIdentifier), {
       recursive: false,
@@ -341,7 +307,7 @@ export async function putFileInRecord(
   localRepoPath: string,
   recordIdentifier: string,
   filepath: string
-) {
+): Promise<void> {
   return await copyFile(
     filepath,
     path.join(localRepoPath, recordIdentifier, path.basename(filepath))
@@ -352,7 +318,7 @@ export async function removeFileInRecord(
   localRepoPath: string,
   recordIdentifier: string,
   filepath: string
-) {
+): Promise<void> {
   return await rm(path.join(localRepoPath, recordIdentifier, filepath))
 }
 
@@ -360,7 +326,7 @@ export async function openFileInRecord(
   localRepoPath: string,
   recordIdentifier: string,
   filepath: string
-) {
+): Promise<string> {
   return await shell.openPath(path.join(localRepoPath, recordIdentifier, filepath))
 }
 
@@ -414,6 +380,6 @@ export async function importRecordsFromTabular(
   })
 }
 
-export async function createRepositoryDirectory(repoPath: string) {
-  return await mkdir(repoPath, { recursive: true })
+export async function createRepositoryDirectory(repoPath: string): Promise<void> {
+  await mkdir(repoPath, { recursive: true })
 }

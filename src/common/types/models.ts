@@ -23,10 +23,10 @@ export interface PromiseDescriptorStatus {
 
 export interface PromiseDescriptor {
   id: string
-  promise: Promise<any>
+  promise: Promise<unknown>
   status: PromiseDescriptorStatus
-  startTime: Date
-  endTime: Date | undefined
+  startTime: number
+  endTime: number | undefined
 }
 
 export interface ProcessDescriptor {

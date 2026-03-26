@@ -15,7 +15,7 @@ if (process.contextIsolated) {
           domain,
           Object.fromEntries(
             (handleKeys as [string, string][]).map(([key, handleKey]) => {
-              return [key, (...args: any) => ipcRenderer.invoke(handleKey, ...args)]
+              return [key, (...args: unknown[]) => ipcRenderer.invoke(handleKey, ...args)]
             })
           )
         )
