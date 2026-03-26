@@ -3,7 +3,6 @@ import { ipcMain } from 'electron'
 export const registeredIPCHandles: Record<string, [string, string][]> = {}
 
 export function registerIPCHandleRetriever() {
-    console.log("registered IPCHandle index retriever.")
     ipcMain.handle("getRegisteredIPCHandles", (_event) => {
         return registeredIPCHandles
     })

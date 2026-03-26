@@ -383,7 +383,6 @@ export async function importRecordsFromTabular(
             let recordMetadata = {}
             Object.assign(recordMetadata, results.data)
             delete recordMetadata[identifierCol]
-            console.log(recordMetadata)
             for (const pathCol of pathColumns) {
               recordMetadata[pathCol] = path.basename(results.data[pathCol])
               promises.push(
@@ -403,7 +402,6 @@ export async function importRecordsFromTabular(
         )
       },
       complete: (results) => {
-        console.log('results')
         if (results.errors.length) reject(results.errors)
         Promise.all(promises).then(() => {
           resolve(identifiers)
