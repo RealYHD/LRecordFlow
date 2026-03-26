@@ -7,6 +7,7 @@ import {
   type RepositoryRecord,
   type RepositoryRecordFilter
 } from '../../../common/types/models'
+import { trackPromise } from './state.svelte'
 
 export async function repoExists(localRepoPath: string) {
   return await window['repo'].repoExists(localRepoPath)
@@ -29,11 +30,13 @@ export async function loadRecordFromRepo(
   localRepoPath: string,
   identifier: string
 ): Promise<RepositoryRecord> {
-  return {
-    identifier: identifier,
-    metadata: await window['repo'].getRecordMetadata(localRepoPath, identifier),
-    files: await window['repo'].getFilesAssociatedWithRecord(localRepoPath, identifier)
-  }
+  return trackPromise(`load record ${localRepoPath} from ${identifier}`, async (status) => {
+    return {
+      identifier: identifier,
+      metadata: await window['repo'].getRecordMetadata(localRepoPath, identifier),
+      files: await window['repo'].getFilesAssociatedWithRecord(localRepoPath, identifier)
+    }
+  }).promise
 }
 
 export function aggregateMetadataDescriptors(
@@ -176,17 +179,16 @@ export async function statRepoConfig(localRepoPath: string): Promise<PathStatus>
   return await window['repo'].statRepoConfig(localRepoPath)
 }
 
-export function validateRecordIdentifier(identifier: string, allIdentifiers: string[]) {
-  // TODO validate that it is a valid path
-  if (identifier.trim().length <= 0) {
-    return 'Identifier cannot be blank'
+export function validateCreatedRecordIdentifier(id: string, currentIds: string[]): string[] {
+  let issues: string[] = []
+  if (id.trim().length == 0) {
+    issues.push(`"${id}" cannot be blank.`)
   }
-  if (identifier.trim().length != identifier.length)
-    return 'Identifier must not have leading or lagging spaces'
-  if (allIdentifiers.includes(identifier)) {
-    return 'Identifier is already in use'
+  if (currentIds.includes(id)) {
+    issues.push(`"${id}" is already being used.`)
   }
-  return ''
+  // TODO somehow check if this can be created...
+  return issues
 }
 
 export function validateRepoConfig(repoConfig: RepositoryConfiguration): Record<string, string[]> {

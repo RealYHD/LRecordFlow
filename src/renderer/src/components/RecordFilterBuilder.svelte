@@ -150,7 +150,6 @@
   <!-- <any|all> <select metadata key> <operator> <operand> -->
   <ButtonGroup>
     <Select
-      class=""
       items={[
         { name: 'Any', value: false },
         { name: 'All', value: true }
@@ -161,8 +160,8 @@
       items={columns.map((desc) => ({ name: desc.displayName, value: desc.key }))}
       bind:value={selectedMetadataKey}
     />
+    <InputAddon>must</InputAddon>
     {#if selectedMetadataKey && selectedMetadataKey.length}
-      <InputAddon>must</InputAddon>
       <Select
         items={Object.values(operatorNames).map((operator) => ({
           name: operator.displayName,
@@ -170,11 +169,10 @@
         }))}
         bind:value={selectedOperator}
       />
-    {/if}
-    {#if selectedMetadataKey && selectedMetadataKey.length}
       {@render keyOperators[selectedMetadataValueType].operandSelector()}
     {:else}
-      <!-- TODO show filler -->
+      <Select disabled={true} />
+      <Input disabled={true} />
     {/if}
     <Button
       disabled={!filterComplete}

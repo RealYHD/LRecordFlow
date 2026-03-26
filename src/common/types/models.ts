@@ -15,15 +15,16 @@ export interface AppConfiguration {
   watchedProcesses: Record<string, ProcessDescriptor>
 }
 
-export interface PromiseDescriptorMessage {
+export interface PromiseDescriptorStatus {
   title: string
   description: string
+  progress: number
 }
 
 export interface PromiseDescriptor {
   id: string
   promise: Promise<any>
-  message: PromiseDescriptorMessage
+  status: PromiseDescriptorStatus
   startTime: Date
   endTime: Date | undefined
 }

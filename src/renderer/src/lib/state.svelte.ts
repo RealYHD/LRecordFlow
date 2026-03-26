@@ -2,7 +2,7 @@ import { SvelteMap } from 'svelte/reactivity'
 import type {
   AppConfiguration,
   PromiseDescriptor,
-  PromiseDescriptorMessage,
+  PromiseDescriptorStatus,
   Repository
 } from '../../../common/types/models'
 
@@ -18,24 +18,26 @@ const trackedPromises: SvelteMap<string, PromiseDescriptor> = new SvelteMap()
 
 export function trackPromise(
   id: string,
-  generatePromise: (message: PromiseDescriptorMessage) => Promise<any>,
+  generatePromise: (status: PromiseDescriptorStatus) => Promise<any>,
   stopTrackingOnComplete: boolean = true
 ): PromiseDescriptor {
   if (trackedPromises.has(id)) return trackedPromises.get(id)
-  let message: PromiseDescriptorMessage = {
+  let status: PromiseDescriptorStatus = {
     title: '',
-    description: ''
+    description: '',
+    progress: 0
   }
-  let generatedPromise = generatePromise(message)
+  let generatedPromise = generatePromise(status)
   trackedPromises.set(id, {
     id: id,
     promise: generatedPromise,
-    message: message,
+    status: status,
     startTime: new Date(),
     endTime: undefined
   })
   generatedPromise.then(() => {
     getTrackedPromise(id).endTime = new Date()
+    getTrackedPromise(id).status.progress = 1
   })
   if (stopTrackingOnComplete) {
     generatedPromise.then(() => {

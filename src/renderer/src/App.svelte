@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Navbar, NavBrand, NavLi, NavUl, NavHamburger } from 'flowbite-svelte'
   import { Router } from 'sv-router'
-  import { p } from './lib/router.svelte'
+  import { p, route } from './lib/router.svelte'
   import { saveConfiguration, guaranteeConfiguration, openedRepo } from './lib/state.svelte'
   import logo from './assets/icon.png'
   guaranteeConfiguration()
@@ -26,7 +26,7 @@
   </NavBrand>
 
   <NavHamburger />
-  <NavUl>
+  <NavUl activeUrl={route.pathname}>
     {#if repoOpened}
       <NavLi href={p('/repository')}>{openedRepo.repo.name}</NavLi>
     {/if}
