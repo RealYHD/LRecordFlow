@@ -9,15 +9,17 @@ const api = {}
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
-    ipcRenderer.invoke("getRegisteredIPCHandles").then((ipcHandles) => {
+    ipcRenderer.invoke('getRegisteredIPCHandles').then((ipcHandles) => {
       for (const [domain, handleKeys] of Object.entries(ipcHandles)) {
         contextBridge.exposeInMainWorld(
           domain,
-          Object.fromEntries((handleKeys as [string, string][]).map(([key, handleKey]) => {
-            return [key, (...args: any) => ipcRenderer.invoke(handleKey, ...args)]
-          })))
+          Object.fromEntries(
+            (handleKeys as [string, string][]).map(([key, handleKey]) => {
+              return [key, (...args: any) => ipcRenderer.invoke(handleKey, ...args)]
+            })
+          )
+        )
       }
-
     })
   } catch (error) {
     console.error(error)

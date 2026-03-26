@@ -1,6 +1,6 @@
 # LRepoFlow
 
-A git based approach to relational record keeping with a directory store per record. An Electron application with Svelte and TypeScript
+A directory based approach to relational record keeping with a directory store per record where files in the directory are considered tied to the record. Supports multiple users interacting with one repository at a time. An Electron application with Svelte and TypeScript.
 
 ## Recommended IDE Setup
 

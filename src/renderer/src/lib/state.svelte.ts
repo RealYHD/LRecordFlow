@@ -22,12 +22,12 @@ export function trackPromise(
   stopTrackingOnComplete: boolean = true
 ): PromiseDescriptor {
   if (trackedPromises.has(id)) return trackedPromises.get(id)
-  let status: PromiseDescriptorStatus = {
+  const status: PromiseDescriptorStatus = {
     title: '',
     description: '',
     progress: 0
   }
-  let generatedPromise = generatePromise(status)
+  const generatedPromise = generatePromise(status)
   trackedPromises.set(id, {
     id: id,
     promise: generatedPromise,

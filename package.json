@@ -1,10 +1,10 @@
 {
   "name": "lrepoflow",
   "version": "1.0.0",
-  "description": "An Electron application with Svelte and TypeScript",
+  "description": "A directory based approach to relational record keeping with a directory store per record.",
   "main": "./out/main/index.js",
-  "author": "example.com",
-  "homepage": "https://electron-vite.org",
+  "author": "RealYHD",
+  "homepage": "realyhd.me",
   "scripts": {
     "format": "prettier --plugin prettier-plugin-svelte --write .",
     "lint": "eslint --cache .",

@@ -5,7 +5,7 @@ export async function previewTabular(
   path: string
 ): Promise<Record<string, Record<string, number>>> {
   return new Promise<Record<string, Record<string, number>>>((resolve, reject) => {
-    let preview: Record<string, Record<string, number>> = {}
+    const preview: Record<string, Record<string, number>> = {}
     Papa.parse<Record<string, string>>(createReadStream(path), {
       header: true,
       step(results) {

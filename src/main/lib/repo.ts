@@ -38,7 +38,7 @@ export async function repoHasPendingChanges(localRepoPath: string) {
 }
 
 export async function repoIsSynced(localRepoPath: string) {
-  let gitStatus = await simpleGit({ baseDir: localRepoPath }).fetch().status()
+  const gitStatus = await simpleGit({ baseDir: localRepoPath }).fetch().status()
   return gitStatus.ahead == 0 && gitStatus.behind == 0
 }
 
@@ -77,7 +77,7 @@ export async function recordExists(
   localRepoPath: string,
   recordIdentifier: string
 ): Promise<boolean> {
-  let recordDirectory = getRecordPath(localRepoPath, recordIdentifier)
+  const recordDirectory = getRecordPath(localRepoPath, recordIdentifier)
   try {
     await access(recordDirectory)
   } catch (error) {
@@ -111,16 +111,16 @@ export async function statRepoConfig(localRepoPath) {
 }
 
 export async function attemptLockPath(pathToLock: string): Promise<boolean> {
-  let pathStat = await stat(pathToLock)
-  let pathIsDir = pathStat.isDirectory()
-  let basename = path.basename(pathToLock)
-  let lockInfoPath = pathIsDir
+  const pathStat = await stat(pathToLock)
+  const pathIsDir = pathStat.isDirectory()
+  const basename = path.basename(pathToLock)
+  const lockInfoPath = pathIsDir
     ? path.join(pathToLock, lockInfoFilename)
     : path.join(
         path.dirname(pathToLock),
         (basename.startsWith('.') ? basename : '.' + basename) + lockInfoFilename
       )
-  let lockInfo = {
+  const lockInfo = {
     currentUser: userInfo().username,
     lockDate: new Date()
   }
@@ -136,10 +136,10 @@ export async function attemptLockPath(pathToLock: string): Promise<boolean> {
 }
 
 export async function attemptUnlockPath(pathToUnlock: string) {
-  let pathStat = await stat(pathToUnlock)
-  let pathIsDir = pathStat.isDirectory()
-  let basename = path.basename(pathToUnlock)
-  let lockInfoPath = pathIsDir
+  const pathStat = await stat(pathToUnlock)
+  const pathIsDir = pathStat.isDirectory()
+  const basename = path.basename(pathToUnlock)
+  const lockInfoPath = pathIsDir
     ? path.join(pathToUnlock, lockInfoFilename)
     : path.join(
         path.dirname(pathToUnlock),
@@ -159,10 +159,10 @@ export async function attemptUnlockPath(pathToUnlock: string) {
 }
 
 export async function getPathStats(pathToStat: string): Promise<PathStatus> {
-  let pathStat = await stat(pathToStat)
-  let pathIsDir = pathStat.isDirectory()
-  let basename = path.basename(pathToStat)
-  let lockInfoPath = pathIsDir
+  const pathStat = await stat(pathToStat)
+  const pathIsDir = pathStat.isDirectory()
+  const basename = path.basename(pathToStat)
+  const lockInfoPath = pathIsDir
     ? path.join(pathToStat, lockInfoFilename)
     : path.dirname(pathToStat) +
       (basename.startsWith('.') ? basename : '.' + basename) +
@@ -192,16 +192,16 @@ export async function getPathStats(pathToStat: string): Promise<PathStatus> {
 }
 
 export async function getRepoLastModified(localRepoPath: string): Promise<Date | null> {
-  let recordIdentifiers: string[] = await getAllRecordsForRepo(localRepoPath)
+  const recordIdentifiers: string[] = await getAllRecordsForRepo(localRepoPath)
   let lastModified: Date | null = null
   for (const recordIdentifier of recordIdentifiers) {
-    let recordStats: PathStatus = await statRecord(localRepoPath, recordIdentifier)
+    const recordStats: PathStatus = await statRecord(localRepoPath, recordIdentifier)
     if (recordStats.lastModified == null) continue
     if (lastModified == undefined || recordStats.lastModified > lastModified) {
       lastModified = recordStats.lastModified
     }
   }
-  let repoStat = await statRepoConfig(localRepoPath)
+  const repoStat = await statRepoConfig(localRepoPath)
   if (
     lastModified == null ||
     (repoStat.lastModified != null && repoStat.lastModified > lastModified)
@@ -215,7 +215,7 @@ export async function recordHasMetadata(
   localRepoPath: string,
   recordIdentifier: string
 ): Promise<boolean> {
-  let metadataPath = getRecordMetadataPath(localRepoPath, recordIdentifier)
+  const metadataPath = getRecordMetadataPath(localRepoPath, recordIdentifier)
   try {
     await access(metadataPath)
   } catch (error) {
@@ -371,8 +371,8 @@ export async function importRecordsFromTabular(
   pathColumns: string[]
 ): Promise<string[]> {
   return new Promise((resolve, reject) => {
-    let identifiers: string[] = []
-    let promises: Promise<void>[] = []
+    const identifiers: string[] = []
+    const promises: Promise<void>[] = []
     Papa.parse<Record<string, string>>(createReadStream(tabularPath), {
       header: true,
       step: (results) => {
@@ -380,7 +380,7 @@ export async function importRecordsFromTabular(
         identifiers.push(results.data[identifierCol])
         promises.push(
           mkdir(path.join(localRepoPath, results.data[identifierCol])).then(() => {
-            let recordMetadata = {}
+            const recordMetadata = {}
             Object.assign(recordMetadata, results.data)
             delete recordMetadata[identifierCol]
             for (const pathCol of pathColumns) {

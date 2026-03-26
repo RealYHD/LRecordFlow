@@ -9,7 +9,10 @@ export async function selectSingleDirectory() {
 }
 
 export async function selectSingleFileOfType(fileFilters: FileFilter[]) {
-  const {canceled, filePaths} = await dialog.showOpenDialog({ properties: ['openFile'], filters: fileFilters })
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    properties: ['openFile'],
+    filters: fileFilters
+  })
   if (!canceled) {
     return filePaths[0]
   }

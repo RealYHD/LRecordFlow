@@ -9,7 +9,7 @@ import {
 } from '../../../common/types/models'
 import { trackPromise } from './state.svelte'
 
-export async function repoExists(localRepoPath: string) {
+export async function repoExists(localRepoPath: string): Promise<boolean> {
   return await window['repo'].repoExists(localRepoPath)
 }
 
@@ -43,8 +43,8 @@ export function aggregateMetadataDescriptors(
   records: RepositoryRecord[],
   repoConfig: RepositoryConfiguration
 ): MetadataDescriptor[] {
-  let descriptors: MetadataDescriptor[] = $state([])
-  let included: Set<string> = new Set()
+  const descriptors: MetadataDescriptor[] = $state([])
+  const included: Set<string> = new Set()
   for (const definedDescriptor of repoConfig.defined) {
     if (definedDescriptor.key == 'Identifier') continue
     included.add(definedDescriptor.key)
@@ -95,16 +95,16 @@ export function validateRecords(
   records: RepositoryRecord[],
   metadataDescriptors: MetadataDescriptor[]
 ): Record<string, Record<string, string[]>> {
-  let issues: Record<string, Record<string, string[]>> = $state({})
+  const issues: Record<string, Record<string, string[]>> = $state({})
   for (const record of records) {
     issues[record.identifier] = {}
-    let recordIssues = issues[record.identifier]
+    const recordIssues = issues[record.identifier]
     for (const { key, value: valueDesc, required } of metadataDescriptors) {
       recordIssues[key] = []
       const metadataIssues = recordIssues[key]
       if (key.trim() == '') metadataIssues.push('Metadata key cannot be empty.')
       if (record.metadata[key] == undefined && !required) continue
-      let recordStringValue: string = (record.metadata[key] || '').toString()
+      const recordStringValue: string = (record.metadata[key] || '').toString()
       switch (valueDesc.valueType) {
         case MetadataValueType.Date:
           if (!Date.parse(recordStringValue))
@@ -180,7 +180,7 @@ export async function statRepoConfig(localRepoPath: string): Promise<PathStatus>
 }
 
 export function validateCreatedRecordIdentifier(id: string, currentIds: string[]): string[] {
-  let issues: string[] = []
+  const issues: string[] = []
   if (id.trim().length == 0) {
     issues.push(`"${id}" cannot be blank.`)
   }
@@ -192,7 +192,7 @@ export function validateCreatedRecordIdentifier(id: string, currentIds: string[]
 }
 
 export function validateRepoConfig(repoConfig: RepositoryConfiguration): Record<string, string[]> {
-  let issues: Record<string, string[]> = $state({})
+  const issues: Record<string, string[]> = $state({})
   for (const { key } of repoConfig.defined) {
     issues[key] = []
     const metadataIssues = issues[key]

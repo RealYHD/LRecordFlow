@@ -1,0 +1,31 @@
+on: [push]
+jobs:
+  lint:
+    runs-on: docker
+    container:
+      image: node:24.14.1-alpine
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v4
+      - name: install dependencies
+        run: npm install
+      - name: lint
+        run: npm run lint
+  typecheck:
+    runs-on: docker
+    container:
+      image: node:24.14.1-alpine
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v4
+      - name: install dependencies
+        run: npm install
+      - name: typecheck
+        run: npm run typecheck
+  test:
+    runs-on: docker
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v4
+      - name: placeholder
+        run: echo "No tests yet!"
