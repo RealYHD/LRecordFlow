@@ -54,9 +54,6 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Install semantic-release
-        run: npm install forgejo-semantic-release -D
-
       - name: build-linux
         if: matrix.os == 'debian-latest'
         run: npm run build:linux
@@ -72,4 +69,4 @@ jobs:
       - name: Release
         env:
           FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-        run: npx semantic-release
+        run: npx --package semantic-release --package @fsl-s/semantic-release-forgejo semantic-release
