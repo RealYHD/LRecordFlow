@@ -5,6 +5,7 @@
   "main": "./out/main/index.js",
   "author": "RealYHD",
   "homepage": "realyhd.me",
+  "private": "true",
   "scripts": {
     "format": "prettier --plugin prettier-plugin-svelte --write .",
     "lint": "eslint --cache .",

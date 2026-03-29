@@ -51,11 +51,8 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: build-win
-        if: matrix.os == 'windows-latest'
+      - name: Build
         run: npm run build:win
 
       - name: Release
-        env:
-          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-        run: npx --package semantic-release --package @fsl-s/semantic-release-forgejo semantic-release
+        run: npx semantic-release
