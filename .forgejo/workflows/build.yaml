@@ -13,6 +13,10 @@ jobs:
 
       - name: lint
         run: npm run lint
+
+      - name: lint commit message
+        run: npx commitlint --last --verbose
+
   typecheck:
     runs-on: docker
     container:
@@ -48,11 +52,11 @@ jobs:
         TARGET_PLATFORM: 'win'
         TARGET_EXEC_EXT: 'exe'
     steps:
-      - name: Check out Git repository
+      - name: check out git repository
         uses: actions/checkout@v4
 
-      - name: Install Dependencies
+      - name: install dependencies
         run: npm install
 
-      - name: Release
+      - name: release
         run: npx --package @semantic-release/exec semantic-release
