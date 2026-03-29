@@ -41,10 +41,10 @@ jobs:
       - name: install dependencies
         run: npm install
 
-      - name: placeholder
+      - name: run tests
         run: echo "No tests yet!"
 
-      - name: test build
+      - name: try build
         run: npm run build
   release-windows:
     needs:
