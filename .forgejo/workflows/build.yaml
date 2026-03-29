@@ -65,4 +65,5 @@ jobs:
         env:
           TARGET_PLATFORM: win
           TARGET_EXEC_EXT: exe
+          PACKAGE_UPLOAD_TOKEN: ${{ secrets.PACKAGE_UPLOAD_TOKEN }}
         run: npx --package @semantic-release/exec semantic-release
