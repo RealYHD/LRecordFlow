@@ -40,6 +40,9 @@ jobs:
 
       - name: placeholder
         run: echo "No tests yet!"
+
+      - name: test build
+      - run: npm run build
   release-windows:
     needs:
       - lint
@@ -59,4 +62,4 @@ jobs:
         env:
           TARGET_PLATFORM: win
           TARGET_EXEC_EXT: exe
-        run: export TARGET_PLATFORM TARGET_EXEC_EXT && npx --package @semantic-release/exec semantic-release
+        run: npx --package @semantic-release/exec semantic-release
