@@ -1,6 +1,6 @@
 {
   "name": "lrepoflow",
-  "version": "development",
+  "version": "0.0.0-semantically-released",
   "description": "A directory based approach to relational record keeping with a directory store per record.",
   "main": "./out/main/index.js",
   "author": "RealYHD",
