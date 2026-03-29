@@ -42,7 +42,7 @@ jobs:
         run: echo "No tests yet!"
 
       - name: test build
-      - run: npm run build
+        run: npm run build
   release-windows:
     needs:
       - lint
