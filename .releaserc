@@ -11,7 +11,8 @@
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "npm run build:${env.TARGET_PLATFORM}"
+        "prepareCmd": "npm run build:${env.TARGET_PLATFORM}",
+        "publishCmd": "curl --user ${env.FORGEJO_REPOSITORY_OWNER}:${env.FORGEJO_TOKEN} --upload-file dist/lrepoflow-${nextRelease.version}-setup${env.TARGET_EXEC_EXT} https://git.reslate.solutions/api/packages/${env.FORGEJO_REPOSITORY_OWNER}/generic/lrepoflow/${nextRelease.version}/lrepoflow-${nextRelease.version}-setup.${env.TARGET_EXEC_EXT}"
       }
     ]
   ]

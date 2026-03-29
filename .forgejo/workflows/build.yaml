@@ -46,6 +46,7 @@ jobs:
       image: electronuserland/builder:wine
       env:
         TARGET_PLATFORM: 'win'
+        TARGET_EXEC_EXT: 'exe'
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v4
