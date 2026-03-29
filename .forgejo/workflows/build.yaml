@@ -44,6 +44,8 @@ jobs:
     runs-on: docker
     container:
       image: electronuserland/builder:wine
+      env:
+        TARGET_PLATFORM: 'win'
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v4
@@ -51,8 +53,5 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Build
-        run: npm run build:win
-
       - name: Release
-        run: npx semantic-release
+        run: npx --package @semantic-release/exec semantic-release

@@ -7,6 +7,12 @@
       {
         "npmPublish": false
       }
+    ],
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "npm run build:${env.TARGET_PLATFORM}"
+      }
     ]
   ]
 }
