@@ -46,7 +46,7 @@ jobs:
 
       - name: try build
         run: npm run build
-  release-windows:
+  release:
     needs:
       - lint
       - typecheck
@@ -63,7 +63,5 @@ jobs:
 
       - name: release
         env:
-          TARGET_PLATFORM: win
-          TARGET_EXEC_EXT: exe
           PACKAGE_UPLOAD_TOKEN: ${{ secrets.PACKAGE_UPLOAD_TOKEN }}
         run: npx --package @semantic-release/exec semantic-release

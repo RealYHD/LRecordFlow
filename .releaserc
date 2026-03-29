@@ -21,8 +21,8 @@
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "npm run build:${process.env.TARGET_PLATFORM}",
-        "publishCmd": "curl --user ${process.env.FORGEJO_REPOSITORY_OWNER}:${process.env.PACKAGE_UPLOAD_TOKEN} --upload-file dist/lrepoflow-${nextRelease.version}-setup.${process.env.TARGET_EXEC_EXT} https://git.reslate.solutions/api/packages/${process.env.FORGEJO_REPOSITORY_OWNER}/generic/lrepoflow/${nextRelease.version}/lrepoflow-${nextRelease.version}-setup.${process.env.TARGET_EXEC_EXT}"
+        "prepareCmd": "npm run build:win",
+        "publishCmd": "curl --user ${process.env.FORGEJO_REPOSITORY_OWNER}:${process.env.PACKAGE_UPLOAD_TOKEN} --upload-file dist/lrepoflow-${nextRelease.version}-setup.exe https://git.reslate.solutions/api/packages/${process.env.FORGEJO_REPOSITORY_OWNER}/generic/lrepoflow/${nextRelease.version}/lrepoflow-${nextRelease.version}-setup.exe"
       }
     ]
   ]
