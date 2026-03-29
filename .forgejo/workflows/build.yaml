@@ -57,6 +57,6 @@ jobs:
 
       - name: release
         env:
-          TARGET_PLATFORM: 'win'
-          TARGET_EXEC_EXT: 'exe'
+          TARGET_PLATFORM: win
+          TARGET_EXEC_EXT: exe
         run: npx --package @semantic-release/exec semantic-release
