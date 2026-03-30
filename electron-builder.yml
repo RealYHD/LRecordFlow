@@ -42,6 +42,3 @@ npmRebuild: false
 publish:
   provider: generic
   url: https://example.com/auto-updates
-electronFuses:
-  enableEmbeddedAsarIntegrityValidation: true
-  onlyLoadAppFromAsar: true
