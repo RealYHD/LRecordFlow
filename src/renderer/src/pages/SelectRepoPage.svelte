@@ -19,10 +19,10 @@
     repoExists
   } from '../lib/repo.svelte'
   import { onMount } from 'svelte'
-  import { navigate } from '../lib/router.svelte'
   import { FolderArrowRightOutline, TrashBinOutline } from 'flowbite-svelte-icons'
   import AddRepository from '../components/AddRepository.svelte'
   import type { Repository } from '../../../common/types/models'
+  import { location } from '@svelte-router/core'
 
   interface RepositoryInformation {
     repository: Repository | undefined
@@ -134,7 +134,7 @@
               <Button
                 onclick={() => {
                   openedRepo.repo = repoInfo.repository
-                  navigate('/repository')
+                  location.navigate('/view')
                 }}
               >
                 {#if openedRepo.repo && openedRepo.repo.local == localPath}

@@ -53,10 +53,13 @@ jobs:
       - test
     runs-on: docker
     container:
-      image: electronuserland/builder:wine
+      image: electronuserland/builder:18-wine-mono-03.25
     steps:
       - name: check out git repository
         uses: actions/checkout@v4
+
+      - name: display node version
+      - run: node --version
 
       - name: install dependencies
         run: npm install

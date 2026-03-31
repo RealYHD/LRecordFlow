@@ -3,12 +3,18 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerIPCHandleRetriever, registerIPCHandles } from './lib/IpcIndexer'
+import log from 'electron-log/main'
 import * as repo from './lib/repo'
 import * as persistence from './lib/persistence'
 import * as dialog from './lib/dialog'
 import * as tabular from './lib/tabular'
 
 function createWindow(): void {
+  // Initialize the logger to be available in renderer process
+  log.initialize()
+  log.errorHandler.startCatching()
+  log.transports.ipc.level = 'debug' // TODO change this for non-alpha releases
+
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 900,
@@ -57,6 +63,12 @@ app.whenReady().then(() => {
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
+
+    window.webContents.on('before-input-event', (_event, input) => {
+      if (input.control && input.shift && input.key.toLowerCase() == 'd') {
+        window.webContents.openDevTools()
+      }
+    })
   })
 
   // Register Entire Module IPCs
