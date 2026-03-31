@@ -2,7 +2,7 @@ import { access, copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 
 import path from 'path'
 import { shell } from 'electron'
 import Papa from 'papaparse'
-import { createReadStream } from 'fs'
+import { createReadStream, Stats } from 'fs'
 import { check, lock, unlock } from 'proper-lockfile'
 import { userInfo } from 'os'
 import { PathStatus, RepositoryConfiguration, lockStatus } from '../../common/types/models'
@@ -115,7 +115,12 @@ export async function attemptUnlockPath(pathToUnlock: string): Promise<boolean> 
 }
 
 export async function getPathStats(pathToStat: string): Promise<PathStatus> {
-  const pathStat = await stat(pathToStat)
+  let pathStat: Stats | undefined = undefined
+  try {
+    pathStat = await stat(pathToStat)
+  } catch {
+    return { lastModified: null, lockStatus: null }
+  }
   const pathIsDir = pathStat.isDirectory()
   const basename = path.basename(pathToStat)
   const lockInfoPath = pathIsDir
@@ -127,12 +132,7 @@ export async function getPathStats(pathToStat: string): Promise<PathStatus> {
     currentUser: userInfo().username,
     lockDate: new Date()
   }
-  let lastModifiedTime: Date | undefined = undefined
-  try {
-    lastModifiedTime = (await stat(pathToStat)).mtime
-  } catch {
-    return { lastModified: null, lockStatus: null }
-  }
+  const lastModifiedTime: Date | undefined = pathStat.mtime
   if (await check(pathToStat)) {
     // Has ownership over lock
     try {
