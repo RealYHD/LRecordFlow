@@ -19,7 +19,8 @@
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "npm run build && electron-builder --mac",
-    "build:linux": "npm run build && electron-builder --linux"
+    "build:linux": "npm run build && electron-builder --linux",
+    "prepare": "husky"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
@@ -56,6 +57,7 @@
     "flowbite": "^4.0.1",
     "flowbite-svelte": "^1.31.0",
     "flowbite-svelte-icons": "^3.1.0",
+    "husky": "^9.1.7",
     "prettier": "^3.7.4",
     "prettier-plugin-svelte": "^3.4.0",
     "svelte": "^5.45.6",
