@@ -1,5 +1,5 @@
 {
-  "name": "lrepoflow",
+  "name": "lrecordflow",
   "version": "0.0.0-development",
   "description": "A directory based approach to relational record keeping with a directory store per record.",
   "main": "./out/main/index.js",

@@ -15,14 +15,14 @@
 
 <Navbar>
   <NavBrand href={repoOpened ? '/repository' : '/'}>
-    <span class="px-2"><img src={logo} class="w-auto h-8" alt="lRepoFlow logo" /></span>
+    <span class="px-2"><img src={logo} class="w-auto h-8" alt="lRecordFlow logo" /></span>
     {#if repoOpened}
       <span class="self-center text-xl font-semibold whitespace-nowrap dark:text-white"
-        >{openedRepo.repo.name}@lRepoFlow</span
+        >{openedRepo.repo.name}@lRecordFlow</span
       >
     {:else}
       <span class="self-center text-xl font-semibold whitespace-nowrap dark:text-white"
-        >lRepoFlow</span
+        >lRecordFlow</span
       >
     {/if}
   </NavBrand>

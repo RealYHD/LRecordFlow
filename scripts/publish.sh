@@ -1,2 +1,2 @@
 #! /bin/bash
-curl --user ${FORGEJO_REPOSITORY_OWNER}:${PACKAGE_UPLOAD_TOKEN} --upload-file dist/lrepoflow-${VERSION}-setup.exe https://git.reslate.solutions/api/packages/${FORGEJO_REPOSITORY_OWNER}/generic/lrepoflow/${VERSION}/lrepoflow-${VERSION}-setup.exe
+curl --user ${FORGEJO_REPOSITORY_OWNER}:${PACKAGE_UPLOAD_TOKEN} --upload-file dist/lrecordflow-${VERSION}-setup.exe https://git.reslate.solutions/api/packages/${FORGEJO_REPOSITORY_OWNER}/generic/lrecordflow/${VERSION}/lrecordflow-${VERSION}-setup.exe
