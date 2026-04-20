@@ -11,57 +11,43 @@
     TableHeadCell,
     Tooltip
   } from 'flowbite-svelte'
-  import { appConfig, guaranteeConfiguration, openedRepo } from '../lib/state.svelte'
+  import { appConfig, openedRepo } from '../lib/state.svelte'
   import {
     getAllRecordsForRepo,
     getRepoLastModified,
     openRepoDirectory,
     repoExists
   } from '../lib/repo.svelte'
-  import { onMount } from 'svelte'
   import { FolderArrowRightOutline, TrashBinOutline } from 'flowbite-svelte-icons'
   import AddRepository from '../components/AddRepository.svelte'
   import type { Repository } from '../../../common/types/models'
   import { location } from '@svelte-router/core'
 
-  interface RepositoryInformation {
-    repository: Repository | undefined
-    lastModified: string | undefined
-    recordCount: number | undefined
-  }
-
-  let repos: Record<string, RepositoryInformation> = $state({})
-
-  let addRepositoryModalOpen: boolean = $state(false)
-
-  function loadRepos(): void {
-    repos = {}
-    for (const repo of appConfig.knownRepos) {
-      let repoInfo: RepositoryInformation = {
-        repository: repo,
-        lastModified: undefined,
-        recordCount: undefined
-      }
-      let promises: Promise<void>[] = []
-      promises.push(
-        getRepoLastModified(repo.local).then((lastModified) => {
-          if (lastModified) {
-            repoInfo.lastModified = lastModified.toLocaleString()
-          } else {
-            repoInfo.lastModified = 'Unavailable'
-          }
-        })
-      )
-      promises.push(
-        getAllRecordsForRepo(repo.local).then((records) => {
-          repoInfo.recordCount = records.length
-        })
-      )
-      Promise.all(promises).then(() => {
-        repos[repo.local] = repoInfo
+  let repositories: Repository[] = $derived(appConfig.knownRepos)
+  let lastModified: Record<string, Promise<Date | undefined>> = $derived.by(() => {
+    let modifiedPromises: Record<string, Promise<Date | undefined>> = {}
+    for (const repo of repositories) {
+      modifiedPromises[repo.local] = getRepoLastModified(repo.local)
+    }
+    return modifiedPromises
+  })
+  let recordCounts: Record<string, Promise<number>> = $derived.by(() => {
+    let recordCountPromises: Record<string, Promise<number>> = {}
+    for (const repo of repositories) {
+      recordCountPromises[repo.local] = new Promise((resolve, reject) => {
+        getAllRecordsForRepo(repo.local)
+          .then((records) => {
+            resolve(records.length)
+          })
+          .catch((reason) => {
+            reject(reason)
+          })
       })
     }
-  }
+    return recordCountPromises
+  })
+
+  let addRepositoryModalOpen: boolean = $state(false)
 
   async function validateRepositoryInformation(
     repoName: string,
@@ -86,11 +72,7 @@
     return issues
   }
 
-  onMount(() => {
-    guaranteeConfiguration().then(() => {
-      loadRepos()
-    })
-  })
+  $inspect(appConfig)
 </script>
 
 <Modal bind:open={addRepositoryModalOpen}>
@@ -106,7 +88,6 @@
             local: path
           })
           addRepositoryModalOpen = false
-          loadRepos()
         }}
         validateValues={validateRepositoryInformation}
       />
@@ -127,17 +108,17 @@
       <TableHeadCell>Record Count</TableHeadCell>
     </TableHead>
     <TableBody>
-      {#each Object.entries(repos).toSorted(([, repoA], [, repoB]) => Date.parse(repoA.lastModified) - Date.parse(repoB.lastModified)) as [localPath, repoInfo], index (index)}
+      {#each repositories as repository, index (index)}
         <TableBodyRow>
           <TableBodyCell>
             <ButtonGroup size="sm">
               <Button
                 onclick={() => {
-                  openedRepo.repo = repoInfo.repository
-                  location.navigate('/view')
+                  openedRepo.repo = repository
+                  location.navigate('/view', { hash: true })
                 }}
               >
-                {#if openedRepo.repo && openedRepo.repo.local == localPath}
+                {#if openedRepo.repo && openedRepo.repo.local == repository.local}
                   View
                 {:else}
                   Open
@@ -148,10 +129,11 @@
                 onclick={() => {
                   openedRepo.repo = undefined
                   appConfig.knownRepos.splice(index, 1)
-                  loadRepos()
                 }}><TrashBinOutline /></Button
               >
-              <Button id={`open-${index}-dir-btn`} onclick={() => openRepoDirectory(localPath)}
+              <Button
+                id={`open-${index}-dir-btn`}
+                onclick={() => openRepoDirectory(repository.local)}
                 ><FolderArrowRightOutline /></Button
               >
             </ButtonGroup>
@@ -161,28 +143,28 @@
             <Tooltip triggeredBy={`#open-${index}-dir-btn`}>Open Repository Directory</Tooltip>
           </TableBodyCell>
           <TableBodyCell>
-            {repoInfo.repository.name}
+            {repository.name}
           </TableBodyCell>
           <TableBodyCell>
-            {#if repoInfo.lastModified != undefined}
-              {repoInfo.lastModified}
-            {:else}
-              Loading...
-            {/if}
+            {#await lastModified[repository.local]}
+              loading...
+            {:then lastModifiedDate}
+              {lastModifiedDate.toLocaleTimeString()}
+            {/await}
           </TableBodyCell>
-          <TableBodyCell>{localPath}</TableBodyCell>
+          <TableBodyCell>{repository.local}</TableBodyCell>
           <TableBodyCell>
-            {#if repoInfo.recordCount != undefined}
-              {repoInfo.recordCount}
-            {:else}
-              Loading...
-            {/if}
+            {#await recordCounts[repository.local]}
+              loading...
+            {:then count}
+              {count}
+            {/await}
           </TableBodyCell>
         </TableBodyRow>
       {/each}
     </TableBody>
   </Table>
-  {#if Object.entries(repos).length == 0}
+  {#if Object.entries(repositories).length == 0}
     <div class="w-fit my-2 mx-auto">
       <span class="text-sm">No known repositories! Add one to get started!</span>
     </div>

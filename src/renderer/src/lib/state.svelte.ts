@@ -64,12 +64,17 @@ export function isTrackedPromiseDone(id: string): boolean {
 }
 
 export function guaranteeConfiguration(): Promise<AppConfiguration> {
-  return trackPromise(LoadStatePromiseId, (message) => {
-    message.title = 'Loading Configuration'
-    message.description = 'Loading configuration'
-    return window['persistence'].load('config', $state.snapshot(appConfig)).then((value) => {
-      Object.assign(appConfig, value)
-      message.description = 'Completed loading configuration'
-    })
-  }).promise as Promise<AppConfiguration>
+  return trackPromise(
+    LoadStatePromiseId,
+    (message) => {
+      console.log('reloading')
+      message.title = 'Loading Configuration'
+      message.description = 'Loading configuration'
+      return window['persistence'].load('config', $state.snapshot(appConfig)).then((value) => {
+        Object.assign(appConfig, value)
+        message.description = 'Completed loading configuration'
+      })
+    },
+    false
+  ).promise as Promise<AppConfiguration>
 }
