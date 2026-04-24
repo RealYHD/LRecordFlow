@@ -3,6 +3,24 @@ export interface Repository {
   local: string
 }
 
+export interface SlurmJobMetrics {
+  JobID: string
+  JobName: string
+  Partition: string
+  Account: string
+  AllocCPUS: number
+  State: string
+  ExitCode: number
+}
+
+export interface SshConnectionDetails {
+  host: string
+  port: number
+  username: string
+  privateKeyPath: string | undefined
+  password: string | undefined
+}
+
 export interface NotificationDescriptor {
   title: string
   date: Date
@@ -12,6 +30,7 @@ export interface NotificationDescriptor {
 
 export interface AppConfiguration {
   knownRepos: Repository[]
+  connections: SshConnectionDetails[]
   watchedProcesses: Record<string, ProcessDescriptor>
 }
 
