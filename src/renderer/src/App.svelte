@@ -6,6 +6,7 @@
   import HelpPage from './pages/HelpPage.svelte'
   import { calculateHref, location, Route, Router } from '@svelte-router/core'
   import RepoViewPage from './pages/RepoViewPage.svelte'
+  import Processes from './pages/Processes.svelte'
 
   guaranteeConfiguration()
   let repoOpened: boolean = $derived(openedRepo.repo != undefined)
@@ -34,6 +35,7 @@
     {/if}
     <NavLi href={calculateHref('/')}>Open</NavLi>
     <NavLi href={calculateHref('/help')}>Help</NavLi>
+    <NavLi href={calculateHref('/processes')}>Processes</NavLi>
   </NavUl>
 </Navbar>
 
@@ -47,6 +49,9 @@
     </Route>
     <Route key="help" path="/help">
       <HelpPage />
+    </Route>
+    <Route key="processes" path="/processes">
+      <Processes />
     </Route>
   </div>
 </Router>

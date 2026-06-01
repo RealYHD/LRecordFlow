@@ -51,6 +51,7 @@
     ExclamationCircleOutline,
     FileImportOutline,
     FilterOutline,
+    FloppyDiskAltOutline,
     FloppyDiskOutline,
     FolderArrowRightOutline,
     PlusOutline,
@@ -61,7 +62,12 @@
   import ConfigureRepository from '../components/ConfigureRepository.svelte'
   import { SvelteSet } from 'svelte/reactivity'
   import TabularImport from '../components/TabularRecordImport.svelte'
-  import { guaranteeConfiguration, openedRepo, trackPromise } from '../lib/state.svelte'
+  import {
+    guaranteeConfiguration,
+    openedRepo,
+    trackedPromises,
+    trackPromise
+  } from '../lib/state.svelte'
   import {
     MetadataValueType,
     type MetadataDescriptor,
@@ -74,7 +80,7 @@
   } from '../../../common/types/models'
   import RecordFilterBuilder from '../components/RecordFilterBuilder.svelte'
   import AddRecord from '../components/CreateRecord.svelte'
-
+  const RECORD_RELOAD_PROMISE_ID = 'reload records'
   let liveRepoConfiguration: RepositoryConfiguration = $state({
     defined: [],
     exactKeys: false
@@ -185,6 +191,10 @@
 
   let importTabularOpen = $state(false)
 
+  let loadingRecords = $derived(
+    trackedPromises.values().find((desc) => desc.id.startsWith('load record')) !== undefined
+  )
+
   async function addRecord(identifier: string): Promise<void> {
     liveRecords.push({
       identifier: identifier,
@@ -270,9 +280,8 @@
       reloadRecord(...identifiers)
     })
   }
-
   function reloadRecord(...identifiers: string[]): void {
-    trackPromise('reload records', async (status) => {
+    trackPromise(RECORD_RELOAD_PROMISE_ID, async (status) => {
       status.title = 'Loading Records'
       status.description = 'Loading Records'
       let recordsLoaded = 0
@@ -571,7 +580,10 @@
       <Table hoverable={true} border={true}>
         <TableHead class="normal-case">
           <TableHeadCell class="w-fit">
-            {#if totalDisplayedIssueCount}
+            {#if loadingRecords}
+              <FloppyDiskAltOutline color="blue" />
+              <Tooltip>Loading records from storage...</Tooltip>
+            {:else if totalDisplayedIssueCount}
               <ExclamationCircleOutline color="red" />
               <Tooltip
                 >Validation failed for {Object.keys(displayedRecordIssueCount).length} (unsaved) records</Tooltip

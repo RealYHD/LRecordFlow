@@ -10,12 +10,12 @@ export const LoadStatePromiseId = 'Load State'
 
 export const appConfig: AppConfiguration = $state({
   knownRepos: [],
-  watchedProcesses: {}
+  watchedProcesses: {},
+  connections: []
 })
 
 export const openedRepo: { repo: Repository } = $state({ repo: undefined })
-const trackedPromises: SvelteMap<string, PromiseDescriptor> = new SvelteMap()
-
+export const trackedPromises: SvelteMap<string, PromiseDescriptor> = new SvelteMap()
 export function trackPromise(
   id: string,
   generatePromise: (status: PromiseDescriptorStatus) => Promise<unknown>,

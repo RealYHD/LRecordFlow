@@ -71,8 +71,6 @@
     }
     return issues
   }
-
-  $inspect(appConfig)
 </script>
 
 <Modal bind:open={addRepositoryModalOpen}>
