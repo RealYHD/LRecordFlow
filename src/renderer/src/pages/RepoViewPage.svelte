@@ -1,67 +1,28 @@
 <script lang="ts">
   import {
     aggregateMetadataDescriptors,
+    attemptLockRecord,
+    attemptLockRepoConfig,
+    attemptUnlockRecord,
+    attemptUnlockRepoConfig,
+    calcModifiedRecords,
     countIssues,
     deleteRecord,
+    filterRecords,
+    getAllRecordsForRepo,
     getRepoConfig,
+    loadRecordFromRepo,
     openRepoRecordDirectory,
     recordDataIsEqual,
+    recordExists,
     saveRecord,
     setRepoConfig,
-    validateRecords,
-    getAllRecordsForRepo,
-    loadRecordFromRepo,
     statRecord,
-    attemptLockRecord,
-    attemptUnlockRecord,
-    recordExists,
     statRepoConfig,
-    attemptLockRepoConfig,
-    attemptUnlockRepoConfig,
-    validateCreatedRecordIdentifier
+    validateCreatedRecordIdentifier,
+    validateRecords
   } from '../lib/repo.svelte'
-  import {
-    Badge,
-    Button,
-    ButtonGroup,
-    Drawer,
-    Label,
-    Modal,
-    PaginationNav,
-    Popover,
-    Table,
-    TableBody,
-    TableBodyCell,
-    TableBodyRow,
-    TableHead,
-    TableHeadCell,
-    Tooltip
-  } from 'flowbite-svelte'
-  import EditRecordData from '../components/EditRecordData.svelte'
-  import {
-    AdjustmentsVerticalOutline,
-    AngleDownOutline,
-    AngleUpOutline,
-    ArrowLeftOutline,
-    ArrowRightOutline,
-    ChalkboardUserOutline,
-    CheckCircleOutline,
-    ClipboardCheckOutline,
-    EditOutline,
-    ExclamationCircleOutline,
-    FileImportOutline,
-    FilterOutline,
-    FloppyDiskAltOutline,
-    FloppyDiskOutline,
-    FolderArrowRightOutline,
-    PlusOutline,
-    RefreshOutline,
-    TrashBinOutline
-  } from 'flowbite-svelte-icons'
   import { onMount } from 'svelte'
-  import ConfigureRepository from '../components/ConfigureRepository.svelte'
-  import { SvelteSet } from 'svelte/reactivity'
-  import TabularImport from '../components/TabularRecordImport.svelte'
   import {
     guaranteeConfiguration,
     openedRepo,
@@ -72,15 +33,22 @@
     MetadataValueType,
     type MetadataDescriptor,
     type PathStatus,
-    type lockStatus,
     type RecordMetadata,
     type RepositoryConfiguration,
     type RepositoryRecord,
-    type RepositoryRecordFilter
+    type RepositoryRecordFilter,
+    type lockStatus
   } from '../../../common/types/models'
-  import RecordFilterBuilder from '../components/RecordFilterBuilder.svelte'
-  import AddRecord from '../components/CreateRecord.svelte'
+  import { SvelteSet } from 'svelte/reactivity'
+  import RepoViewToolbar from '../components/RepoViewToolbar.svelte'
+  import RepoTableView from '../components/RepoTableView.svelte'
+  import EditRecordData from '../components/EditRecordData.svelte'
+  import ConfigureRepository from '../components/ConfigureRepository.svelte'
+  import TabularImport from '../components/TabularRecordImport.svelte'
+  import { Modal, Drawer } from 'flowbite-svelte'
+
   const RECORD_RELOAD_PROMISE_ID = 'reload records'
+
   let liveRepoConfiguration: RepositoryConfiguration = $state({
     defined: [],
     exactKeys: false
@@ -163,16 +131,6 @@
     sortedRecords.slice((currentPage - 1) * maxPerPage, currentPage * maxPerPage)
   )
   const displayedMetadata: MetadataDescriptor[] = $derived(liveMetadataDescriptors)
-  let recordLocks: Record<string, lockStatus | undefined> = $derived(
-    Object.fromEntries(
-      displayedRecords.map(({ record }) => [
-        record.identifier,
-        liveRecordDirStats[record.identifier]
-          ? liveRecordDirStats[record.identifier].lockStatus
-          : null
-      ])
-    )
-  )
   let displayedRecordIssues: Record<string, Record<string, string[]>> = $derived(
     validateRecords(
       displayedRecords.map(({ record }) => record),
@@ -188,12 +146,42 @@
   let editRecordDataOpen: boolean = $state(false)
   let editingLiveIndex: number = $state(0)
   let editRepoConfigOpen: boolean = $state(false)
-
   let importTabularOpen = $state(false)
-
   let loadingRecords = $derived(
     trackedPromises.values().find((desc) => desc.id.startsWith('load record')) !== undefined
   )
+
+  // Computed row data for the table component
+  let rows: {
+    record: RepositoryRecord
+    liveRecordIndex: number
+    localRepoPath: string
+    lockStatus: lockStatus | null | undefined
+    issues: Record<string, string[]>
+    modified: boolean
+    flushTimer: { delay: number; flushing: boolean } | undefined
+  }[] = $derived(
+    displayedRecords.map(({ record, liveRecordIndex }) => ({
+      record: record,
+      liveRecordIndex: liveRecordIndex,
+      localRepoPath: openedRepo.repo.local,
+      lockStatus: liveRecordDirStats[record.identifier]
+        ? liveRecordDirStats[record.identifier].lockStatus
+        : null,
+      issues: displayedRecordIssues[record.identifier] || {},
+      modified: modifiedRecords.has(record.identifier),
+      flushTimer: recordFlushTimers[record.identifier]
+    }))
+  )
+
+  let displayCount: number = $derived(displayedRecords.length)
+  let hasFlushTimers: boolean = $derived(Object.keys(recordFlushTimers).length > 0)
+
+  function sortColumn(key: string): void {
+    if (liveSortingColumns[key] == undefined) liveSortingColumns[key] = true
+    else if (liveSortingColumns[key] == true) liveSortingColumns[key] = false
+    else if (liveSortingColumns[key] == false) delete liveSortingColumns[key]
+  }
 
   async function addRecord(identifier: string): Promise<void> {
     liveRecords.push({
@@ -201,7 +189,7 @@
       metadata: {},
       files: []
     })
-    editingLiveIndex = liveRecords.findLastIndex((record) => record.identifier == identifier) // probably O(1)?
+    editingLiveIndex = liveRecords.findLastIndex((record) => record.identifier == identifier)
     editRecord(editingLiveIndex)
     editRecordDataOpen = true
   }
@@ -224,24 +212,6 @@
       liveRecords.splice(deleteRecordIndex, 1)
       delete persistedRecordMetadata[recordIdentifier]
     })
-  }
-
-  function calcModifiedRecords(
-    liveRecords: RepositoryRecord[],
-    persistedRecordData: Record<string, RecordMetadata>
-  ): SvelteSet<string> {
-    let modifiedRecords: SvelteSet<string> = new SvelteSet()
-    for (const liveRecord of liveRecords) {
-      if (
-        !recordDataIsEqual(
-          $state.snapshot(liveRecord.metadata),
-          $state.snapshot(persistedRecordData[liveRecord.identifier])
-        )
-      ) {
-        modifiedRecords.add(liveRecord.identifier)
-      }
-    }
-    return modifiedRecords
   }
 
   function flushRecord(recordIdentifier: string): void {
@@ -387,7 +357,6 @@
                   liveRecordDirStats[identifier].lastModified < recordDirStat.lastModified) ||
                 !liveRecordDirStats[identifier]
               ) {
-                // TODO this is rather disorganized, and we should probably do this logic somewhere else.
                 reloadRecord(identifier)
               }
               liveRecordDirStats[identifier] = recordDirStat
@@ -420,6 +389,10 @@
     }
   }
 
+  function clearFilters(key: string): void {
+    delete liveRecordFilters[key]
+  }
+
   function recordDirStatsUpdateTick(): void {
     recordStatTimer -= recordStatTickInterval
     if (recordStatTimer <= 0) {
@@ -428,32 +401,6 @@
         updateStats(...displayedRecords.map(({ record }) => record.identifier))
       }
     }
-  }
-
-  function filterRecords(
-    records: RepositoryRecord[],
-    filters: RepositoryRecordFilter[]
-  ): {
-    record: RepositoryRecord
-    liveRecordIndex: number
-  }[] {
-    return records
-      .map((record, index) => ({ record: record, liveRecordIndex: index }))
-      .filter(({ record }) => {
-        let passed = false
-        if (filters.length == 1 && !filters[0]) return true
-        for (const filter of filters) {
-          if (!filter) {
-            continue
-          }
-          let currentFilterPassed = filter.predicate(
-            record.metadata[filter.key] || record[filter.key] || ''
-          )
-          passed = currentFilterPassed ? true : passed
-          if (filter.must && !currentFilterPassed) return false
-        }
-        return passed || filters.length == 0
-      })
   }
 
   onMount(() => {
@@ -470,6 +417,29 @@
     window.clearInterval(flushIntervalTimerId)
     window.clearInterval(recordLockUpdateTimerId)
   }
+
+  // Import and config callbacks
+  function openImportTabular(): void {
+    importTabularOpen = true
+  }
+
+  function openConfigureRepo(): void {
+    attemptLockRepoConfig(openedRepo.repo.local).then((success) => {
+      if (success) {
+        editRepoConfigOpen = true
+      } else {
+        // TODO display error about it being locked
+      }
+    })
+  }
+
+  function validateRepoIdentifier(identifier: string): string[] {
+    return validateCreatedRecordIdentifier(identifier, Object.keys(liveRecordsByIds))
+  }
+
+  let repoConfLockStatus: lockStatus | null | undefined = $derived(
+    liveRepoConfFileStats?.lockStatus
+  )
 </script>
 
 <svelte:window onbeforeunload={onWindowUnload} />
@@ -517,284 +487,40 @@
 </Drawer>
 
 <div class="flex-1 flex shrink flex-col overflow-y-auto">
-  <div class="max-h-full">
-    <div class="mb-2 mx-1 flex flex-wrap justify-between items-end">
-      <div class="mb-2 mx-2">
-        <Label>Search/Filter</Label>
-        <RecordFilterBuilder
-          columns={liveColumns}
-          onFilterCreated={addFilterForMetadataKey}
-          bind:filter={demoFilter}
-        />
-        {#if demoFilter}
-          <Popover>
-            <Badge>{demoFilter.displayName}</Badge>
-          </Popover>
-        {/if}
-      </div>
-      <div class="flex flex-wrap items-end">
-        <div class="w-fit h-fit mb-2 mx-2">
-          <Button id="add-record-button">
-            <PlusOutline />
-          </Button>
-          <Button
-            id="import-button"
-            onclick={() => {
-              importTabularOpen = true
-            }}><FileImportOutline /></Button
-          >
-          <Button
-            id="repo-configure-button"
-            disabled={liveRepoConfFileStats ? liveRepoConfFileStats.lockStatus != null : true}
-            onclick={() => {
-              attemptLockRepoConfig(openedRepo.repo.local).then((success) => {
-                if (success) {
-                  editRepoConfigOpen = true
-                } else {
-                  // TODO display error about it being locked
-                }
-              })
-            }}
-          >
-            <AdjustmentsVerticalOutline />
-          </Button>
-          <Popover trigger="hover" triggeredBy="#add-record-button" title="Create Record">
-            <AddRecord
-              {addRecord}
-              validateIdentifier={(identifier) =>
-                validateCreatedRecordIdentifier(identifier, Object.keys(liveRecordsByIds))}
-            />
-          </Popover>
-          <Tooltip triggeredBy="#import-button">Import data from Tabular</Tooltip>
-          <Tooltip triggeredBy="#repo-configure-button">
-            {#if liveRepoConfFileStats && liveRepoConfFileStats.lockStatus}
-              Waiting for {liveRepoConfFileStats.lockStatus.currentUser} to Finish Editing...
-            {:else}
-              Configure Repository
-            {/if}
-          </Tooltip>
-        </div>
-      </div>
-    </div>
-    <div>
-      <Table hoverable={true} border={true}>
-        <TableHead class="normal-case">
-          <TableHeadCell class="w-fit">
-            {#if loadingRecords}
-              <FloppyDiskAltOutline color="blue" />
-              <Tooltip>Loading records from storage...</Tooltip>
-            {:else if totalDisplayedIssueCount}
-              <ExclamationCircleOutline color="red" />
-              <Tooltip
-                >Validation failed for {Object.keys(displayedRecordIssueCount).length} (unsaved) records</Tooltip
-              >
-            {:else if modifiedRecords.size && Object.keys(recordFlushTimers).length}
-              <FloppyDiskOutline color="yellow" />
-              <Tooltip>{modifiedRecords.size} records still pending saving...</Tooltip>
-            {:else}
-              <ClipboardCheckOutline color="green" />
-              <Tooltip>Everything looks good and is saved!</Tooltip>
-            {/if}
-          </TableHeadCell>
-          <TableHeadCell>Actions</TableHeadCell>
-          <TableHeadCell>
-            {@render columnHeaderDisplay('identifier', 'Identifier')}
-          </TableHeadCell>
-          {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key } (key)}
-            <TableHeadCell>
-              {@render columnHeaderDisplay(key, key)}
-            </TableHeadCell>
-          {/each}
-        </TableHead>
-        <TableBody>
-          {#each displayedRecords as { record: { identifier, metadata }, liveRecordIndex }, index (index)}
-            <TableBodyRow class="border-gray-200">
-              <TableBodyCell>
-                <div class="flex justify-start items-center space-x-2">
-                  <span>
-                    {#if displayedRecordIssueCount[identifier]}
-                      <ExclamationCircleOutline color="red" />
-                      <Tooltip>
-                        {displayedRecordIssueCount[identifier]} issue(s) found with metadata associated
-                        with this record. Updates will not be saved until fixed.
-                      </Tooltip>
-                    {:else if modifiedRecords.has(identifier) && recordFlushTimers[identifier]}
-                      <FloppyDiskOutline color="cyan" />
-                      <Tooltip>
-                        Saving record in {(recordFlushTimers[identifier].delay / 1000).toFixed(0)} seconds...
-                      </Tooltip>
-                    {:else if recordLocks[identifier]}
-                      <ChalkboardUserOutline color="purple" />
-                      <Tooltip>
-                        The record cannot be modified at this time as {liveRecordDirStats[
-                          identifier
-                        ].lockStatus.currentUser} is editing this record.
-                      </Tooltip>
-                    {:else}
-                      <CheckCircleOutline class="shrink-0" color="green" />
-                      <Tooltip>No issues found and record is saved.</Tooltip>
-                    {/if}
-                  </span>
-                </div>
-              </TableBodyCell>
-              <TableBodyCell>
-                <span>
-                  <ButtonGroup>
-                    <Button
-                      id={`edit-record-${liveRecordIndex}-btn`}
-                      onclick={() => editRecord(liveRecordIndex)}
-                      size="xs"
-                      class="p-2!"
-                      pill
-                      outline
-                      disabled={recordLocks[identifier] != null}><EditOutline size="xs" /></Button
-                    >
-                    <Button
-                      id={`reload-record-${liveRecordIndex}-btn`}
-                      onclick={() => reloadRecord(identifier)}
-                      size="xs"
-                      pill
-                      outline
-                      class="p-2!"><RefreshOutline size="xs" /></Button
-                    >
-                    <Button
-                      id={`open-dir-record-${liveRecordIndex}-btn`}
-                      onclick={() => openRepoRecordDirectory(openedRepo.repo.local, identifier)}
-                      size="xs"
-                      pill
-                      outline
-                      class="p-2!"
-                      disabled={recordLocks[identifier] != null}
-                    >
-                      <FolderArrowRightOutline size="xs" />
-                    </Button>
-                    <Button
-                      id={`delete-record-${liveRecordIndex}-btn`}
-                      onclick={() => {
-                        removeRecord(liveRecordIndex)
-                      }}
-                      size="xs"
-                      pill
-                      outline
-                      color="red"
-                      disabled={recordLocks[identifier] != null}
-                      class="p-2!"><TrashBinOutline size="xs" /></Button
-                    >
-                  </ButtonGroup>
-                  <Tooltip triggeredBy={`#edit-record-${liveRecordIndex}-btn`}
-                    >Edit Record Metadata</Tooltip
-                  >
-                  <Tooltip triggeredBy={`#reload-record-${liveRecordIndex}-btn`}
-                    >Reload from Disk</Tooltip
-                  >
-                  <Tooltip triggeredBy={`#open-dir-record-${liveRecordIndex}-btn`}
-                    >Open Record Directory</Tooltip
-                  >
-                  <Tooltip triggeredBy={`#delete-record-${liveRecordIndex}-btn`}
-                    >Delete Record</Tooltip
-                  >
-                </span>
-              </TableBodyCell>
-              <TableBodyCell>{identifier}</TableBodyCell>
-              {#each displayedMetadata.filter(({ key }) => key != 'Identifier') as { key }, colIndex (colIndex)}
-                <TableBodyCell>
-                  <div class="flex items-center">
-                    {#if displayedRecordIssues[identifier][key] && displayedRecordIssues[identifier][key].length}
-                      <ExclamationCircleOutline color="red" class="shrink-0" />
-                      <Popover>
-                        <ul>
-                          {#each displayedRecordIssues[identifier][key] as issue (issue)}
-                            <li>{issue}</li>
-                          {/each}
-                        </ul>
-                      </Popover>
-                    {/if}
-                    {metadata[key]}
-                  </div>
-                </TableBodyCell>
-              {/each}
-            </TableBodyRow>
-          {/each}
-        </TableBody>
-      </Table>
-      {@render tableNavigation()}
-    </div>
-  </div>
+  <RepoViewToolbar
+    columns={liveColumns}
+    onFilterCreated={addFilterForMetadataKey}
+    bind:filter={demoFilter}
+    onImportTabular={openImportTabular}
+    onConfigure={openConfigureRepo}
+    {addRecord}
+    validateIdentifier={validateRepoIdentifier}
+    {repoConfLockStatus}
+  />
+  <RepoTableView
+    columns={liveColumns}
+    {rows}
+    sorting={liveSortingColumns}
+    filters={liveRecordFilters}
+    {demoFilter}
+    {loadingRecords}
+    totalIssueCount={totalDisplayedIssueCount}
+    modifiedCount={modifiedRecords.size}
+    {hasFlushTimers}
+    {currentPage}
+    {totalPages}
+    {maxPerPage}
+    onPageChange={(page) => (currentPage = page)}
+    onMaxPerPageChange={(value) => (maxPerPage = value)}
+    {displayCount}
+    totalRecords={liveRecords.length}
+    localRepoPath={openedRepo.repo.local}
+    onSort={sortColumn}
+    onRemoveFilter={removeFilterForMetadataKey}
+    onClearFilters={clearFilters}
+    onEdit={editRecord}
+    onReload={reloadRecord}
+    onOpenDir={openRepoRecordDirectory}
+    onDelete={removeRecord}
+  />
 </div>
-
-{#snippet tableNavigation()}
-  <div class="pl-1 mx-auto w-fit my-2">
-    <div class="w-fit mb-2 font-light text-sm">
-      Displaying {displayedRecords.length} records out of {liveRecords.length}. Showing maximum of
-      <input
-        class="w-10 text-sm border-0 border-b p-0 m-0 mx-1"
-        type="number"
-        min="1"
-        bind:value={maxPerPage}
-      />
-      per page. Currently on page {currentPage} of {totalPages}.
-    </div>
-    <div class="w-fit mx-auto">
-      <PaginationNav {currentPage} {totalPages} onPageChange={(page) => (currentPage = page)}>
-        {#snippet prevContent()}
-          <span class="sr-only">Previous</span>
-          <ArrowLeftOutline class="h-5 w-5" />
-        {/snippet}
-        {#snippet nextContent()}
-          <span class="sr-only">Next</span>
-          <ArrowRightOutline class="h-5 w-5" />
-        {/snippet}
-      </PaginationNav>
-    </div>
-  </div>
-{/snippet}
-
-{#snippet columnHeaderDisplay(key: string, displayName: string)}
-  <div class="flex items-center">
-    <Button
-      class="py-1! px-2! m-1 border-0"
-      outline
-      size="xs"
-      onclick={() => {
-        if (liveSortingColumns[key] == undefined) liveSortingColumns[key] = true
-        else if (liveSortingColumns[key] == true) liveSortingColumns[key] = false
-        else if (liveSortingColumns[key] == false) delete liveSortingColumns[key]
-      }}
-      >{displayName}
-      <span class="pl-1">
-        {#if liveSortingColumns[key] != undefined}
-          {#if liveSortingColumns[key]}
-            <AngleUpOutline size="xs" />
-          {:else}
-            <AngleDownOutline size="xs" />
-          {/if}
-        {/if}
-      </span>
-    </Button>
-    {#if liveRecordFilters[key] || (demoFilter && demoFilter.key == key)}
-      <span class="relative"><FilterOutline color="orange" /> </span>
-      <Popover title={`Filter on "${displayName}"`}>
-        <div class="space-y-2">
-          <div class="mb-3 flex">
-            {#each Object.values(liveRecordFilters[key] || {}) as filter (filter.identifier)}
-              <Badge class="m-1" dismissable onclose={() => removeFilterForMetadataKey(filter)}
-                >{filter.displayName}</Badge
-              >
-            {:else}
-              <span class="font-light text-sm">No filters added!</span>
-            {/each}
-          </div>
-          <div class="flex">
-            <Button
-              size="xs"
-              class="p-1!"
-              color="alternative"
-              disabled={!liveRecordFilters[key]}
-              onclick={() => delete liveRecordFilters[key]}>Clear Filters</Button
-            >
-          </div>
-        </div>
-      </Popover>
-    {/if}
-  </div>
-{/snippet}

@@ -268,3 +268,47 @@ export async function getRepoLastModified(localRepoPath: string): Promise<Date |
 export async function createRepositoryDirectory(repoPath: string): Promise<string> {
   return await window['repo'].createRepositoryDirectory(repoPath)
 }
+
+export function calcModifiedRecords(
+  liveRecords: RepositoryRecord[],
+  persistedRecordData: Record<string, RecordMetadata>
+): SvelteSet<string> {
+  const modifiedRecords: SvelteSet<string> = new SvelteSet()
+  for (const liveRecord of liveRecords) {
+    if (
+      !recordDataIsEqual(
+        $state.snapshot(liveRecord.metadata),
+        $state.snapshot(persistedRecordData[liveRecord.identifier])
+      )
+    ) {
+      modifiedRecords.add(liveRecord.identifier)
+    }
+  }
+  return modifiedRecords
+}
+
+export function filterRecords(
+  records: RepositoryRecord[],
+  filters: RepositoryRecordFilter[]
+): {
+  record: RepositoryRecord
+  liveRecordIndex: number
+}[] {
+  return records
+    .map((record, index) => ({ record: record, liveRecordIndex: index }))
+    .filter(({ record }) => {
+      let passed = false
+      if (filters.length == 1 && !filters[0]) return true
+      for (const filter of filters) {
+        if (!filter) {
+          continue
+        }
+        const currentFilterPassed = filter.predicate(
+          record.metadata[filter.key] || record[filter.key] || ''
+        )
+        passed = currentFilterPassed ? true : passed
+        if (filter.must && !currentFilterPassed) return false
+      }
+      return passed || filters.length == 0
+    })
+}
