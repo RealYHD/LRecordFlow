@@ -1,47 +1,75 @@
 name: CI
 
-on:
-  push:
-    branches: [main, develop, 'refactor/**']
-  pull_request:
-    branches: [main, develop]
+on: [push]
 
 jobs:
-  ci:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
-      fail-fast: false
-
+  lint:
+    runs-on: self-hosted
     steps:
-      - name: Checkout
+      - name: checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: install dependencies
+        run: npm install --ignore-scripts
+
+      - name: lint
+        run: npm run lint
+
+      - name: lint commit message
+        run: npx commitlint --last --verbose
+
+  typecheck:
+    runs-on: self-hosted
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v4
+
+      - name: install dependencies
+        run: npm install --ignore-scripts
+
+      - name: typecheck
+        run: npm run typecheck
+
+  test:
+    runs-on: self-hosted
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v4
+
+      - name: install dependencies
+        run: npm install --ignore-scripts
+
+      - name: install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: run unit tests
+        run: npm run test
+
+      - name: run E2E tests
+        run: npm run test:e2e
+
+      - name: try build
+        run: npm run build
+
+  release:
+    needs:
+      - lint
+      - typecheck
+      - test
+    runs-on: self-hosted
+    steps:
+      - name: check out git repository
+        uses: actions/checkout@v4
+
+      - name: install node
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
 
-      - name: Install dependencies
+      - name: install dependencies
         run: npm install --ignore-scripts
 
-      - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
-
-      - name: Run type check
-        run: npm run typecheck
-
-      - name: Run lint
-        run: npm run lint
-
-      - name: Run unit tests
-        run: npm run test
-
-      - name: Run build
-        run: npm run build
-
-      - name: Run E2E tests
-        run: npm run test:e2e
-        if: runner.os == 'Linux'
+      - name: release
+        env:
+          PACKAGE_UPLOAD_TOKEN: ${{ secrets.PACKAGE_UPLOAD_TOKEN }}
+        run: npx --package @semantic-release/exec semantic-release
