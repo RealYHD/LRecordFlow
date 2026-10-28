@@ -269,6 +269,13 @@ export async function createRepositoryDirectory(repoPath: string): Promise<strin
   return await window['repo'].createRepositoryDirectory(repoPath)
 }
 
+/**
+ * Calculates which records have been modified compared to their persisted state.
+ *
+ * @param liveRecords — the current records in the table
+ * @param persistedRecordData — a map of record identifier to persisted metadata
+ * @returns a SvelteSet of record identifiers that differ from their persisted state
+ */
 export function calcModifiedRecords(
   liveRecords: RepositoryRecord[],
   persistedRecordData: Record<string, RecordMetadata>
@@ -287,6 +294,19 @@ export function calcModifiedRecords(
   return modifiedRecords
 }
 
+/**
+ * Filters records based on a list of RepositoryRecordFilter predicates.
+ *
+ * must=false filters are OR'd together (a record passes if any match).
+ * must=true filters are AND'd together (a record passes only if all match).
+ * A record passes if it satisfies all must=true filters and at least one
+ * must=false filter (or no must=false filters exist, in which case it still
+ * passes if all must=true filters are satisfied).
+ *
+ * @param records — the records to filter
+ * @param filters — the list of filters to apply
+ * @returns an array of objects containing the record and its original index
+ */
 export function filterRecords(
   records: RepositoryRecord[],
   filters: RepositoryRecordFilter[]

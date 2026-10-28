@@ -1,3 +1,22 @@
+<!--
+  RepoColumnHeader.svelte
+
+  A sortable column header with filter popover support. Each column can be
+  sorted (ascending/descending) and filtered via a dropdown menu.
+
+  Props:
+    - column: MetadataDescriptor — the column metadata
+    - onSort: (key: string) => void — sort callback
+    - onFilterCreated: (filter: RepositoryRecordFilter) => void — filter creation callback
+    - filter: RepositoryRecordFilter | null — active filter for this column
+    - isSortedAsc: boolean — whether the column is sorted ascending
+    - isSortedDesc: boolean — whether the column is sorted descending
+
+  Usage:
+    <RepoColumnHeader {column} {onSort} {onFilterCreated} bind:filter
+      {isSortedAsc} {isSortedDesc} />
+-->
+
 <script lang="ts">
   import { Badge, Button, Popover } from 'flowbite-svelte'
   import { AngleDownOutline, AngleUpOutline, FilterOutline } from 'flowbite-svelte-icons'

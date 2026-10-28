@@ -1,3 +1,45 @@
+<!--
+  RepoTableView.svelte
+
+  The table wrapper that composes the column headers, table body (rows),
+  and pagination controls. It delegates rendering to RepoColumnHeader,
+  RepoTableRow, and RepoTablePagination while managing the table structure.
+
+  Props:
+    - columns: MetadataDescriptor[] — table columns
+    - rows: { record: RepositoryRecord; liveRecordIndex: number }[] — table rows
+    - sorting: Record<string, 'asc' | 'desc'> — sort state per column
+    - filters: RepositoryRecordFilter[] — active filters
+    - demoFilter: RepositoryRecordFilter | null — demo/filter hint
+    - loadingRecords: boolean — loading state
+    - totalIssueCount: number — total issue count
+    - modifiedCount: number — count of modified records
+    - hasFlushTimers: boolean — whether flush timers are active
+    - currentPage: number — current page
+    - totalPages: number — total pages
+    - maxPerPage: number — records per page
+    - displayCount: number — records on current page
+    - totalRecords: number — total records
+    - localRepoPath: string — local repo path
+    - onSort: (key: string) => void — sort callback
+    - onRemoveFilter: (filter: RepositoryRecordFilter) => void — remove filter callback
+    - onClearFilters: (key: string) => void — clear filters callback
+    - onEdit: (record: RepositoryRecord) => void — edit callback
+    - onReload: (record: RepositoryRecord) => void — reload callback
+    - onOpenDir: (record: RepositoryRecord) => void — open directory callback
+    - onDelete: (record: RepositoryRecord) => void — delete callback
+    - onPageChange: (page: number) => void — page change callback
+    - onMaxPerPageChange: (value: number) => void — records per page change callback
+
+  Usage:
+    <RepoTableView {columns} {rows} {sorting} {filters} {demoFilter}
+      {loadingRecords} {totalIssueCount} {modifiedCount} {hasFlushTimers}
+      {currentPage} {totalPages} {maxPerPage} {displayCount} {totalRecords}
+      {localRepoPath} {onSort} {onRemoveFilter} {onClearFilters}
+      {onEdit} {onReload} {onOpenDir} {onDelete}
+      onPagChange={(p) => currentPage = p} onMaxPerPageChange={(v) => maxPerPage = v} />
+-->
+
 <script lang="ts">
   import { Table, TableBody, TableHead, TableHeadCell, Tooltip } from 'flowbite-svelte'
   import {

@@ -1,3 +1,25 @@
+<!--
+  RepoTablePagination.svelte
+
+  Pagination controls for the repository table. Displays the current page,
+  total pages, records per page selector, and total record count.
+
+  Props:
+    - currentPage: number — current page number
+    - totalPages: number — total number of pages
+    - maxPerPage: number — records per page
+    - displayCount: number — records on the current page
+    - totalRecords: number — total record count
+    - onPageChange: (page: number) => void — page change callback
+    - onMaxPerPageChange: (value: number) => void — records per page change callback
+
+  Usage:
+    <RepoTablePagination {currentPage} {totalPages} {maxPerPage}
+      {displayCount} {totalRecords}
+      onPageChange={(p) => currentPage = p}
+      onMaxPerPageChange={(v) => maxPerPage = v} />
+-->
+
 <script lang="ts">
   import { PaginationNav } from 'flowbite-svelte'
   import { ArrowLeftOutline, ArrowRightOutline } from 'flowbite-svelte-icons'

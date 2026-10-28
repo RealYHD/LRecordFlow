@@ -1,3 +1,26 @@
+<!--
+  RepoTableRow.svelte
+
+  A single table row rendering a repository record. Each row displays the
+  record's metadata fields and provides action buttons (edit, reload, open
+  directory, delete) with status indicators for locks and issues.
+
+  Props:
+    - record: RepositoryRecord — the record data
+    - columns: MetadataDescriptor[] — column definitions
+    - onEdit: (record: RepositoryRecord) => void — edit callback
+    - onReload: (record: RepositoryRecord) => void — reload callback
+    - onOpenDir: (record: RepositoryRecord) => void — open directory callback
+    - onDelete: (record: RepositoryRecord) => void — delete callback
+    - lockStatus: LockStatus — lock status for the record
+    - hasIssue: boolean — whether the record has issues
+    - modified: boolean — whether the record is modified
+
+  Usage:
+    <RepoTableRow {record} {columns} {onEdit} {onReload} {onOpenDir} {onDelete}
+      {lockStatus} {hasIssue} {modified} />
+-->
+
 <script lang="ts">
   import {
     Button,
