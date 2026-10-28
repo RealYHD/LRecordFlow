@@ -5,3 +5,6 @@ out
 .eslintcache
 *.log*
 TestRepo
+test-results
+playwright-report
+coverage
