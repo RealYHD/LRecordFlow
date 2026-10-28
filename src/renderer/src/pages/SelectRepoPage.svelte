@@ -11,7 +11,7 @@
     TableHeadCell,
     Tooltip
   } from 'flowbite-svelte'
-  import { appConfig, openedRepo } from '../lib/state.svelte'
+  import { appConfig, openedRepo, saveConfiguration } from '../lib/state.svelte'
   import {
     getAllRecordsForRepo,
     getRepoLastModified,
@@ -85,6 +85,7 @@
             name: name,
             local: path
           })
+          saveConfiguration()
           addRepositoryModalOpen = false
         }}
         validateValues={validateRepositoryInformation}
@@ -127,6 +128,7 @@
                 onclick={() => {
                   openedRepo.repo = undefined
                   appConfig.knownRepos.splice(index, 1)
+                  saveConfiguration()
                 }}><TrashBinOutline /></Button
               >
               <Button
