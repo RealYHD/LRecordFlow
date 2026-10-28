@@ -402,6 +402,29 @@ export async function importRecordsFromTabular(
   })
 }
 
+export async function commitRepo(localRepoPath: string, commitMessage: string): Promise<string> {
+  // Acquire lock for atomic commit
+  const locked = await attemptLockPath(localRepoPath)
+  if (!locked) {
+    throw new Error('Could not lock repository. Another user may be editing.')
+  }
+
+  try {
+    const git = simpleGit(localRepoPath)
+
+    // Check if there are changes to commit
+    const status = await git.status()
+    if (!status.isClean()) {
+      await git.add('-A')
+      await git.commit(commitMessage)
+    }
+
+    return 'Commit successful'
+  } finally {
+    await attemptUnlockPath(localRepoPath)
+  }
+}
+
 export async function createRepositoryDirectory(repoPath: string): Promise<string> {
   await mkdir(repoPath, { recursive: true })
 

@@ -10,6 +10,37 @@ import {
 } from '../../../common/types/models'
 import { trackPromise } from './state.svelte'
 
+export type CommitState = {
+  status: 'idle' | 'committing' | 'completed' | 'error'
+  message?: string
+}
+
+let commitState: CommitState = $state({ status: 'idle' })
+
+export async function commitRepository(
+  localRepoPath: string,
+  commitMessage: string = 'Auto commit'
+): Promise<string> {
+  commitState = { status: 'committing' }
+  try {
+    const result = await commitRepo(localRepoPath, commitMessage)
+    commitState = { status: 'completed', message: result }
+    return result
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Commit failed'
+    commitState = { status: 'error', message: errorMessage }
+    throw error
+  }
+}
+
+export function getCommitState(): CommitState {
+  return commitState
+}
+
+export async function commitRepo(localRepoPath: string, commitMessage: string): Promise<string> {
+  return await window['repo'].commitRepo(localRepoPath, commitMessage)
+}
+
 export async function repoExists(localRepoPath: string): Promise<boolean> {
   return await window['repo'].repoExists(localRepoPath)
 }

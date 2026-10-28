@@ -16,11 +16,21 @@ vi.mock('simple-git', () => {
   const mockGitInstance = {
     init: vi.fn().mockResolvedValue(undefined),
     add: vi.fn().mockResolvedValue(undefined),
-    commit: vi.fn().mockResolvedValue(undefined)
+    commit: vi.fn().mockResolvedValue(undefined),
+    status: vi.fn().mockResolvedValue({ isClean: () => false })
   }
   const mockGit = vi.fn(() => mockGitInstance)
   return { simpleGit: mockGit }
 })
+
+const mockLock = vi.hoisted(() => vi.fn().mockResolvedValue(() => {}))
+const mockUnlock = vi.hoisted(() => vi.fn().mockResolvedValue())
+
+vi.mock('proper-lockfile', () => ({
+  lock: mockLock,
+  unlock: mockUnlock,
+  check: vi.fn().mockResolvedValue(false)
+}))
 
 describe('createRepositoryDirectory (main/lib/repo)', () => {
   let tempDir: string
@@ -65,5 +75,31 @@ describe('createRepositoryDirectory (main/lib/repo)', () => {
     const repoPath = path.join(tempDir, 'test-repo')
     const result = await repoModule.createRepositoryDirectory(repoPath)
     expect(result).toBe(repoPath)
+  })
+})
+
+describe('commitRepo (main/lib/repo)', () => {
+  let tempDir: string
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lrf-test-'))
+    vi.clearAllMocks()
+    fs.mkdirSync(path.join(tempDir, 'test-repo'), { recursive: true })
+  })
+
+  it('should call git.add and git.commit', async () => {
+    const repoPath = path.join(tempDir, 'test-repo')
+    await repoModule.commitRepo(repoPath, 'commit message')
+    const mockGit = simpleGit as vi.MockedFunction<typeof simpleGit>
+    expect(mockGit).toHaveBeenCalledWith(repoPath)
+    expect(mockGit(repoPath).status).toHaveBeenCalled()
+    expect(mockGit(repoPath).add).toHaveBeenCalledWith('-A')
+    expect(mockGit(repoPath).commit).toHaveBeenCalledWith('commit message')
+  })
+
+  it('should return success message', async () => {
+    const repoPath = path.join(tempDir, 'test-repo')
+    const result = await repoModule.commitRepo(repoPath, 'commit message')
+    expect(result).toBe('Commit successful')
   })
 })

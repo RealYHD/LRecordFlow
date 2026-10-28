@@ -13,6 +13,7 @@
     - addRecord: () => void — new record creation callback
     - validateIdentifier: (id: string) => Promise<boolean> — identifier validation
     - repoConfLockStatus: LockStatus — repo config lock status
+    - commit: () => void — repository commit callback
 
   Usage:
     <RepoViewToolbar {columns} {onFilterCreated} bind:filter
@@ -21,7 +22,12 @@
 
 <script lang="ts">
   import { Badge, Button, Label, Popover, Tooltip } from 'flowbite-svelte'
-  import { AdjustmentsVerticalOutline, FileImportOutline, PlusOutline } from 'flowbite-svelte-icons'
+  import {
+    AdjustmentsVerticalOutline,
+    FileImportOutline,
+    PlusOutline,
+    GithubSolid
+  } from 'flowbite-svelte-icons'
   import RecordFilterBuilder from './RecordFilterBuilder.svelte'
   import AddRecord from './CreateRecord.svelte'
   import type { MetadataDescriptor, RepositoryRecordFilter } from '../../../common/types/models'
@@ -34,7 +40,8 @@
     onConfigure,
     addRecord,
     validateIdentifier,
-    repoConfLockStatus
+    repoConfLockStatus,
+    commit
   }: {
     columns: { displayName: string; key: string; valueType: MetadataDescriptor }[]
     onFilterCreated: (filter: RepositoryRecordFilter) => void
@@ -70,6 +77,9 @@
       >
         <AdjustmentsVerticalOutline />
       </Button>
+      <Button id="commit-button" onclick={commit}>
+        <GithubSolid />
+      </Button>
       <Popover trigger="hover" triggeredBy="#add-record-button" title="Create Record">
         <AddRecord {addRecord} {validateIdentifier} />
       </Popover>
@@ -81,6 +91,7 @@
           Configure Repository
         {/if}
       </Tooltip>
+      <Tooltip triggeredBy="#commit-button">Commit Repository</Tooltip>
     </div>
   </div>
 </div>

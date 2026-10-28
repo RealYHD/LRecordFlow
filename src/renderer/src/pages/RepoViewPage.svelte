@@ -6,6 +6,7 @@
     attemptUnlockRecord,
     attemptUnlockRepoConfig,
     calcModifiedRecords,
+    commitRepository,
     countIssues,
     deleteRecord,
     filterRecords,
@@ -433,6 +434,17 @@
     })
   }
 
+  async function commitRepoAction(): Promise<void> {
+    try {
+      await commitRepository(openedRepo.repo.local, 'Auto commit')
+      // Reload records to pick up committed state
+      reloadAllRecords()
+    } catch (error: unknown) {
+      // TODO display error message to user
+      console.error('Commit failed:', error)
+    }
+  }
+
   function validateRepoIdentifier(identifier: string): string[] {
     return validateCreatedRecordIdentifier(identifier, Object.keys(liveRecordsByIds))
   }
@@ -496,6 +508,7 @@
     {addRecord}
     validateIdentifier={validateRepoIdentifier}
     {repoConfLockStatus}
+    commit={commitRepoAction}
   />
   <RepoTableView
     columns={liveColumns}
