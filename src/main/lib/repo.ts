@@ -6,12 +6,34 @@ import { createReadStream, Stats } from 'fs'
 import { check, lock, unlock } from 'proper-lockfile'
 import { userInfo } from 'os'
 import { PathStatus, RepositoryConfiguration, lockStatus } from '../../common/types/models'
+import { simpleGit } from 'simple-git'
 
 const recordMetadataFilename = '.lrf.record.json'
 const repoConfigurationFilename = '.lrf.config.json'
 const lockInfoFilename = '.lrf.lock-info.json'
 
 const ignoredRecordExtensions = ['.git', '.lock']
+
+/**
+ * Creates the LRF-specific .gitignore for a repository.
+ * Excludes LRF internal files while keeping record data tracked.
+ */
+const lrfGitignore = `# LRF internal files
+.lrf.record.json
+.lrf.config.json
+.lrf.lock-info.json
+*.lock
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*~
+`
 function getRecordPath(localRepoPath: string, recordIdentifier: string): string {
   return path.join(localRepoPath, recordIdentifier)
 }
@@ -380,6 +402,26 @@ export async function importRecordsFromTabular(
   })
 }
 
-export async function createRepositoryDirectory(repoPath: string): Promise<void> {
+export async function createRepositoryDirectory(repoPath: string): Promise<string> {
   await mkdir(repoPath, { recursive: true })
+
+  // Write LRF-specific .gitignore (only if it doesn't exist)
+  const gitignorePath = path.join(repoPath, '.gitignore')
+  try {
+    await access(gitignorePath)
+  } catch {
+    await writeFile(gitignorePath, lrfGitignore)
+  }
+
+  // Initialize a git repository for the LRF repo (only if not already initialized)
+  const git = simpleGit(repoPath)
+  try {
+    await git.init()
+    await git.add('.gitignore')
+    await git.commit('Initial LRF repository setup')
+  } catch {
+    // Git repo may already be initialized — that's fine
+  }
+
+  return repoPath
 }
