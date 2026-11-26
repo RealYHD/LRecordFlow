@@ -101,7 +101,32 @@ export interface RepositoryRecordFilter {
   identifier: string
 }
 
+export interface ScriptParameter {
+  key: string // sbatch flag, e.g. "--sample"
+  value: string // template, e.g. "{sample_id}" or a literal
+}
+
+export interface ScriptDefinition {
+  name: string // human-readable script name
+  path: string // relative to repo .lrf/scripts/, e.g. "my_pipeline.py"
+  parameters: ScriptParameter[] // input/param mapping
+  outputColumns: string[] // the columns this script claims it will fill (e.g. ["coverage", "n_contigs"])
+}
+
+export type ScriptStatus = 'idle' | 'pending' | 'running' | 'completed' | 'failed'
+
+export interface RecordScriptState {
+  script: string | null // which script this record is running
+  jobId: string | null // remote process PID (or sbatch JobID for sbatch-based scripts)
+  status: ScriptStatus
+  lastSubmitted: Date | null
+  lastChecked: Date | null
+  output: Record<string, string> | null // parsed return values (key = column)
+}
+
 export interface RepositoryConfiguration {
   defined: MetadataDescriptor[]
   exactKeys: boolean
+  scripts: ScriptDefinition[] // repo-level script registry
+  connection: SshConnectionDetails // default SSH connection for script execution
 }

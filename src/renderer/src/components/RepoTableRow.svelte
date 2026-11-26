@@ -15,10 +15,12 @@
     - lockStatus: LockStatus — lock status for the record
     - hasIssue: boolean — whether the record has issues
     - modified: boolean — whether the record is modified
+    - runnableColumns: string[] — columns that can be run by a script
+    - onRunScript: (identifier: string, column: string) => void — script run callback
 
   Usage:
     <RepoTableRow {record} {columns} {onEdit} {onReload} {onOpenDir} {onDelete}
-      {lockStatus} {hasIssue} {modified} />
+      {lockStatus} {hasIssue} {modified} {runnableColumns} {onRunScript} />
 -->
 
 <script lang="ts">
@@ -56,6 +58,8 @@
     modified,
     flushTimer,
     metadataDescriptors,
+    runnableColumns,
+    onRunScript,
     onEdit,
     onReload,
     onOpenDir,
@@ -69,6 +73,8 @@
     modified: boolean
     flushTimer: { delay: number; flushing: boolean } | undefined
     metadataDescriptors: MetadataDescriptor[]
+    runnableColumns: string[]
+    onRunScript: (identifier: string, column: string) => void
     onEdit: (index: number) => void
     onReload: (identifier: string) => void
     onOpenDir: (localRepoPath: string, identifier: string) => void
@@ -168,7 +174,11 @@
             </ul>
           </Popover>
         {/if}
-        {metadata[key]}
+        {#if runnableColumns.includes(key) && !metadata[key]}
+          <Button size="xs" onclick={() => onRunScript(identifier, key)}>Run</Button>
+        {:else}
+          {metadata[key]}
+        {/if}
       </div>
     </TableBodyCell>
   {/each}

@@ -32,6 +32,18 @@ vi.mock('svelte/reactivity', () => ({
   __esModule: true
 }))
 
+// Mock electron module for main process tests
+vi.mock('electron', () => ({
+  app: {
+    getPath: vi.fn().mockReturnValue('/tmp'),
+    whenReady: vi.fn().mockResolvedValue(undefined),
+    on: vi.fn()
+  },
+  shell: {
+    openPath: vi.fn().mockResolvedValue(undefined)
+  }
+}))
+
 // Mock window for Electron-related code paths
 if (typeof window === 'undefined') {
   globalThis.window = {} as unknown as Window & typeof globalThis

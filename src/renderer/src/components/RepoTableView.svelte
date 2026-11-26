@@ -115,6 +115,7 @@
     onReload: (identifier: string) => void
     onOpenDir: (localRepoPath: string, identifier: string) => void
     onDelete: (index: number) => void
+    onRunScript: (identifier: string, column: string) => void
   } = $props()
 
   let metadataDescriptors: MetadataDescriptor[] = $derived(
@@ -178,6 +179,7 @@
         modified={row.modified}
         flushTimer={row.flushTimer}
         {metadataDescriptors}
+        {onRunScript}
         {onEdit}
         {onReload}
         {onOpenDir}

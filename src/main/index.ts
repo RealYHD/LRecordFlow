@@ -8,6 +8,8 @@ import * as repo from './lib/repo'
 import * as persistence from './lib/persistence'
 import * as dialog from './lib/dialog'
 import * as tabular from './lib/tabular'
+import * as script from './lib/script'
+import * as jobTracker from './lib/jobTracker'
 
 function createWindow(): void {
   // Initialize the logger to be available in renderer process
@@ -76,6 +78,8 @@ app.whenReady().then(() => {
   registerIPCHandles(persistence, 'persistence')
   registerIPCHandles(dialog, 'dialog')
   registerIPCHandles(tabular, 'tabular')
+  registerIPCHandles(script, 'script')
+  registerIPCHandles(jobTracker, 'jobTracker')
   registerIPCHandleRetriever()
   createWindow()
 
@@ -84,6 +88,12 @@ app.whenReady().then(() => {
     // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+// Reconcile in-flight script jobs across all known repos on startup
+app.whenReady().then(async () => {
+  await jobTracker.reconcileAll()
+  jobTracker.startReconciliation()
 })
 
 // Quit when all windows are closed, except on macOS. There, it's common

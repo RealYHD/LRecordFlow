@@ -153,6 +153,12 @@
   )
 
   // Computed row data for the table component
+  let scriptOutputColumns: string[] = $derived(
+    liveRepoConfiguration.scripts?.flatMap((script) =>
+      script.outputColumns.map((col) => `${script.path}:${col}`)
+    ) ?? []
+  )
+
   let rows: {
     record: RepositoryRecord
     liveRecordIndex: number
@@ -161,6 +167,7 @@
     issues: Record<string, string[]>
     modified: boolean
     flushTimer: { delay: number; flushing: boolean } | undefined
+    runnableColumns: string[]
   }[] = $derived(
     displayedRecords.map(({ record, liveRecordIndex }) => ({
       record: record,
@@ -171,7 +178,8 @@
         : null,
       issues: displayedRecordIssues[record.identifier] || {},
       modified: modifiedRecords.has(record.identifier),
-      flushTimer: recordFlushTimers[record.identifier]
+      flushTimer: recordFlushTimers[record.identifier],
+      runnableColumns: scriptOutputColumns.filter((key) => !record.metadata[key])
     }))
   )
 
@@ -275,6 +283,32 @@
     getRepoConfig(openedRepo.repo.local).then((loadedConfig) => {
       Object.assign(liveRepoConfiguration, loadedConfig)
     })
+  }
+
+  async function runScriptForRecord(recordIdentifier: string, column: string): Promise<void> {
+    // Find the script that claims this output column and run it for the record
+    const script = liveRepoConfiguration.scripts?.find((s) =>
+      s.outputColumns.includes(column.split(':')[1])
+    )
+    if (!script) return
+
+    const record = liveRecordsByIds[recordIdentifier]
+    const parameters = script.parameters.map(({ key, value }) => {
+      // Substitute {column} placeholders with the record's metadata values
+      const resolved = value.replace(/\{(\w+)\}/g, (_, param: string) => {
+        return record.metadata[param] || ''
+      })
+      return { key, value: resolved }
+    })
+
+    await window['script'].runScriptOnRecord(
+      openedRepo.repo.local,
+      recordIdentifier,
+      liveRepoConfiguration.connection,
+      script.path,
+      parameters,
+      `.lrf/scripts/cache/${recordIdentifier}_${script.path}.json`
+    )
   }
 
   function importTabular(
@@ -535,5 +569,6 @@
     onReload={reloadRecord}
     onOpenDir={openRepoRecordDirectory}
     onDelete={removeRecord}
+    onRunScript={runScriptForRecord}
   />
 </div>
